@@ -20,4 +20,8 @@ object GlobalConfig {
     FiniteDuration(config.getDuration("toktok.actors.timeout",
       TimeUnit.SECONDS), TimeUnit.SECONDS)
 
+  val akkaRemoteHost: String = config.getString("akka.remote.netty.tcp.hostname")
+
+  val akkaRemotePort: Int = config.getInt("akka.remote.netty.tcp.port")
+
 }

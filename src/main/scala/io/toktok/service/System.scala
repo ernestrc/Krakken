@@ -19,7 +19,9 @@ trait System {
  */
 trait BootedSystem extends System {
 
-  implicit val system: ActorSystem = ActorSystem(name = "toktok")
+  val name: String
+
+  implicit val system: ActorSystem = ActorSystem(name = name)
 
   sys.addShutdownHook(system.shutdown())
 

@@ -3,6 +3,7 @@ name := "toktok_core"
 libraryDependencies ++= List(
   "com.typesafe.akka"               %% "akka-actor"             % "2.3.7",
   "com.typesafe.akka"               %% "akka-slf4j"             % "2.3.7",
+  "com.typesafe.akka"               %% "akka-remote"            % "2.3.7",
   "io.spray"                        %% "spray-can"              % "1.3.2",
   "io.spray"                        %% "spray-routing"          % "1.3.2",
   "io.spray"                        %% "spray-caching"          % "1.3.2",

@@ -2,7 +2,7 @@ package io.toktok.utils
 
 import akka.event.LoggingAdapter
 import com.novus.salat.Grater
-import model.SID
+import io.toktok.model.SID
 import org.bson.types.ObjectId
 import spray.http._
 import spray.httpx.marshalling.Marshaller
@@ -10,6 +10,10 @@ import spray.httpx.unmarshalling.{Deserializer, FromRequestUnmarshaller, Unmarsh
 import unstable.macros.{InjectedTypeHint, TypeHint}
 
 object Implicits {
+
+  implicit class stringPath(root: String){
+    def /(path:String):String = root + "/" + path
+  }
 
   implicit class pimpedObjectId(_id: ObjectId){
     def toSid:SID = _id.toString

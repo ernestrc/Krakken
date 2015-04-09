@@ -4,9 +4,9 @@ import akka.event.LoggingAdapter
 import com.mongodb.casbah.Imports
 import com.mongodb.casbah.Imports._
 import com.novus.salat._
-import io.toktok.model.Event
+import io.toktok.model.{Event, SID}
+import io.toktok.utils.Implicits
 import io.toktok.utils.Implicits._
-import model.SID
 import unstable.macros.TypeHint
 
 import scala.reflect.ClassTag
@@ -30,6 +30,12 @@ class MongoSource[T <: Event : ClassTag](db: MongoDB,
 
   def findAllByEntityId(id: SID): List[_ <: T] = {
     collectionT.find(MongoDBObject("entityId" → id)).toList.map { mongoObject ⇒
+      serializers(mongoObject.as[String]("_typeHint").toHint).asObject(mongoObject)
+    }
+  }
+
+  def listAll: List[_ <: T] = {
+    collectionT.find().toList.map { mongoObject ⇒
       serializers(mongoObject.as[String]("_typeHint").toHint).asObject(mongoObject)
     }
   }

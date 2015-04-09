@@ -3,34 +3,57 @@ package io.toktok.model
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.IO
+import io.toktok.config.GlobalConfig
 import io.toktok.http.DefaultHttpHandler
 import io.toktok.service.BootedSystem
 import spray.can.Http
 
-class MicroService(name: String,
-                   host: String,
-                   port: Int,
+class MicroService(val name: String,
+                   host: Option[String],
+                   port: Option[Int],
                    actorsProps: List[Props],
-                   endpointsProps: List[EndpointProps],
-                   httpHandlerProps: Props)
+                   endpointProps: List[EndpointProps],
+                   httpHandlerProps: Option[Props])
   extends BootedSystem {
 
   implicit val log: LoggingAdapter = system.log
 
-  actorsProps.foreach( props ⇒ system.actorOf(props, props.actorClass().getSimpleName))
+  def initActorSystem(): Unit = {
+    actorsProps.foreach( props ⇒ system.actorOf(props, props.actorClass().getSimpleName))
+    log.info(s"$name actor system is listening on ${GlobalConfig.akkaRemoteHost}:${GlobalConfig.akkaRemotePort}")
+  }
 
-  val httpHandler = system.actorOf(httpHandlerProps)
+  def initHttpServer(p: Int, h:String, handler: Props): Unit = {
+    val httpHandler = system.actorOf(handler)
+    IO(Http) ! Http.Bind(httpHandler, h, port = p)
+    log.info(s"$name http interface is listening on $h:$p")
+  }
 
-  IO(Http) ! Http.Bind(httpHandler, host, port = port)
-
-  log.info(s"$name microservice booted up in host $host and port $port")
-
+  /* Check valid configuration */
+  (host, port, endpointProps, httpHandlerProps) match {
+    case (Some(h), Some(p), list, Some(handler)) if list.nonEmpty ⇒
+      initActorSystem()
+      initHttpServer(p, h, handler)
+    case (None, None, list, None) if list.isEmpty ⇒
+      initActorSystem()
+    case anyElse ⇒
+      throw new Exception(s"Combination $host - $port - $endpointProps - $httpHandlerProps not valid!")
+  }
 }
 
 object MicroService{
 
+  /**
+   * Boot Microservice with actor system and http server
+   */
   def apply(name:String, host:String, port:Int, actorProps: List[Props],
             endpointProps: List[EndpointProps]): MicroService =
-    new MicroService(name, host, port, actorProps, endpointProps,
-      DefaultHttpHandler.props(endpointProps))
+    new MicroService(name, Some(host), Some(port), actorProps, endpointProps,
+      Some(DefaultHttpHandler.props(endpointProps)))
+
+  /**
+   * Boot Microservice only with actor system
+   */
+  def apply(name: String, actorProps: List[Props]): MicroService =
+    new MicroService(name, None, None, actorProps, List.empty, None)
 }

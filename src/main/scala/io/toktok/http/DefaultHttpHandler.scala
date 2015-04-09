@@ -8,6 +8,8 @@ trait HttpHandler { this: HttpConfig with Actor ⇒
 
   val endpointProps: List[EndpointProps]
 
+//  val authenticationProvider: AuthenticationProvider
+
 }
 
 class DefaultHttpHandler(val endpointProps: List[EndpointProps])
@@ -15,17 +17,14 @@ class DefaultHttpHandler(val endpointProps: List[EndpointProps])
 
   override implicit def actorRefFactory: ActorRefFactory = context.system
 
-  val routes: Route = {
-    var _routes: Route = null
-    endpointProps.foreach { endpoint =>
-      val route = endpoint.boot(context.system).route
-      _routes = {
-        if (_routes != null) _routes ~ route
-        else route
-      }
+//  val authenticationProvider: AuthenticationProvider = new TokenAuthentication
+
+  val routes: Route = /*authenticationProvider.actionContext { ctx ⇒*/
+    endpointProps.tail.foldLeft(endpointProps.head.boot(context.system).__route) {
+      (chain, next) ⇒ chain ~ next.boot(context.system).__route
     }
-    _routes
-  }
+  //}
+
 
   def receive: Receive =
     runRoute(routes)(exceptionHandler, rejectionHandler,

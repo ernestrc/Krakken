@@ -9,7 +9,6 @@ import com.mongodb.{BasicDBObjectBuilder, Bytes, DBCursor}
 import com.novus.salat.Grater
 import io.toktok.config.GlobalConfig
 import io.toktok.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe, Unsubscribe}
-import model.SID
 import org.bson.types.BSONTimestamp
 
 import scala.reflect.ClassTag
@@ -20,15 +19,15 @@ trait Subscription {
 }
 
 //TODO throw exception when non-replicaSet?
-case class AkkaSubscription[A <: B : ClassTag, B <: Event : ClassTag]
-(serializer: Grater[A], entityId: SID)(callback: A ⇒ Any)(implicit context: ActorContext) extends Subscription {
+case class AkkaSubscription[A <: Event : ClassTag, B <: Command : ClassTag]
+(serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String)(translator: A ⇒ B)
+(implicit context: ActorContext, subscriber: ActorRef, entityId: Option[String]) extends Subscription {
 
   val subscribedTo = implicitly[ClassTag[A]].runtimeClass
-  val typeHint = subscribedTo.getCanonicalName
-  val parentType = implicitly[ClassTag[B]].runtimeClass.getSimpleName
+  val subscribedTypeHint = subscribedTo.getCanonicalName
 
-  val master = context.actorOf(Props(classOf[SubscriptionMaster[A]],
-    callback, typeHint, parentType, serializer, entityId))
+  val master = context.actorOf(Props(classOf[SubscriptionMaster[A,B]],
+    translator, subscribedTypeHint, remoteSourceHost, serializer, entityId, localDb, subscriber))
 
   def unsubscribe(): Unit = master ! Unsubscribe
 
@@ -43,48 +42,71 @@ object SubscriptionMaster {
 
 }
 
-class SubscriptionMaster[A <: Event](
-  callback: A ⇒ Any,
+class SubscriptionMaster[A <: Event, B <: Command](
+  translator: A ⇒ B,
   typeHint: String,
-  parentType: String,
+  remoteSourceHost: String,
   serializer: Grater[A],
-  entityId: SID
+  entityId: Option[String],
+  localDb: MongoDB,
+  subscriber: ActorRef
 ) extends Actor with ActorLogging {
 
   override def supervisorStrategy: SupervisorStrategy = OneForOneStrategy(loggingEnabled = true) {
     case _: Exception => worker ! Subscribe(generateCursor(lastTs)); Restart;
   }
 
+  val initQuery: DBObject = entityId match {
+    case Some(id) ⇒
+      MongoDBObject(
+        "_typeHint" → typeHint,
+        "entityId" → entityId
+      )
+    case _ ⇒ MongoDBObject("_typeHint" → typeHint)
+  }
+
+  val cursorQuery = { ts: BSONTimestamp ⇒
+    entityId match {
+      case Some(id) ⇒ MongoDBObject(
+        "ts" → MongoDBObject("$gt" → ts),
+        "o._typeHint" → typeHint,
+        "o.entityId" → entityId,
+        "ns" → MongoDBObject( "$ne" → "toktok.subscriptions")
+      )
+      case _ ⇒ MongoDBObject(
+        "ts" → MongoDBObject("$gt" → ts),
+        "o._typeHint" → typeHint,
+        "ns" → MongoDBObject( "$ne" → "toktok.subscriptions")
+      )
+    }
+  }
+
   @throws[Exception](classOf[Exception])
   override def preStart(): Unit = {
-    log.debug(s"Subscribing to events in mongodb://$eventSourceHost in col $parentType of type $typeHint")
-    val ts = Try(localColl.underlying.find(
-        MongoDBObject(
-            "o._typeHint" → typeHint,
-            "o.entityId" → entityId)
-    ).sort(BasicDBObjectBuilder.start("_id", -1).get())
-    .limit(1).one().as[ObjectId]("_id").getTimestamp)
-    lastTs = ts.map(t ⇒ new BSONTimestamp(t, 0)).getOrElse(new BSONTimestamp())
-    log.debug(s"Last object of $typeHint was inserted was on $lastTs")
+    log.debug(s"Subscribing to events in mongodb://$eventSourceHost of type $typeHint")
+    lastTs = Try(localColl.underlying.find(initQuery).sort(BasicDBObjectBuilder.start("_id", -1).get())
+      .limit(1).one().as[ObjectId]("_id").getTimestamp) match {
+      case Success(i) ⇒
+        log.debug(s"Found a $typeHint as last inserted in subscriptions with ts $i")
+        new BSONTimestamp(i, 10)
+      case Failure(err) ⇒
+        log.debug(s"Did not find any $typeHint in subscription collection. Reason $err")
+        new BSONTimestamp()
+    }
     worker ! Subscribe(generateCursor(lastTs))
   }
 
-  val eventSourceHost: String = GlobalConfig.collectionsHost(parentType)
+  val eventSourceHost: String = remoteSourceHost
   val subsClient = MongoClient(eventSourceHost)
   val opLog = subsClient("local")("oplog.rs")
-  val localClient = MongoClient(GlobalConfig.mongoHost)
-  val localColl = localClient(GlobalConfig.mongoDb)(parentType)
+  val localColl = localDb("subscriptions")
 
   var lastTs: BSONTimestamp = null
   val worker = context.actorOf(
-    Props(classOf[SubscriptionWorker[A]], callback, serializer))
+    Props(classOf[SubscriptionWorker[A,B]], translator, serializer, subscriber))
 
   def generateCursor(l: BSONTimestamp): DBCursor = {
-    val query = MongoDBObject(
-      "ts" → MongoDBObject("$gt" → l),
-      "o._typeHint" → typeHint,
-      "o.entityId" → entityId
-    )
+    val query = cursorQuery(l)
     val sort = BasicDBObjectBuilder.start("$natural", 1).get()
 
     opLog.underlying
@@ -114,7 +136,8 @@ class SubscriptionMaster[A <: Event](
   }
 }
 
-class SubscriptionWorker[A <: Event](callback: A ⇒ Any, serializer: Grater[A]) 
+class SubscriptionWorker[A <: Event, B <: Command]
+(translator: A ⇒ B, serializer: Grater[A], subscriber: ActorRef)
   extends Actor with ActorLogging {
   import akka.pattern.ask
   import context.dispatcher
@@ -133,11 +156,11 @@ class SubscriptionWorker[A <: Event](callback: A ⇒ Any, serializer: Grater[A])
       val eventObj = dbObjectEvent.get("o").asInstanceOf[DBObject]
       val event = serializer.asObject(eventObj)
       val ts = dbObjectEvent.as[BSONTimestamp]("ts")
-      lazy val logWarn = log.warning(s"Could not process dispatched subscription event $event!")
+      lazy val logWarn = log.error(s"Could not process dispatched subscription event $event!")
       context.parent.ask(DispatchedEvent(ts, eventObj))
         .mapTo[Receipt]
         .onComplete{
-        case Success(receipt) if receipt.success ⇒ callback(event)
+        case Success(receipt) if receipt.success ⇒ subscriber ! translator(event)
         case Success(receiptFalse) ⇒ logWarn
         case Failure(err) ⇒ logWarn
       }

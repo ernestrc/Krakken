@@ -1,4 +1,4 @@
-import io.toktok.model.Command
+package io.toktok
 
 /**
  * Created by ernest on 4/4/15.

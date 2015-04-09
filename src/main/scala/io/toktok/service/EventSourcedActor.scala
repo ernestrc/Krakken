@@ -1,24 +1,44 @@
 package io.toktok.service
 
-import akka.actor.{Actor, ActorLogging}
+import akka.actor.{ActorRef, Actor, ActorLogging}
 import io.toktok.dal.MongoSource
 import io.toktok.model.Exceptions.TokTokException
-import io.toktok.model.{Command, Event, Receipt}
+import io.toktok.model._
+
+import scala.reflect.ClassTag
 
 /**
  * Created by ernest on 4/2/15.
  */
-abstract class EventSourcedActor[T <: Event] extends Actor with ActorLogging {
+abstract class EventSourcedActor[T <: Event : ClassTag] extends Actor with ActorLogging {
+
+  override def postStop(): Unit = {
+    subscriptions.foreach(_.unsubscribe())
+  }
+
+  override def preStart(): Unit = {
+    log.info(s"Booting up event sourced actor - ${self.path.name}...")
+    val count: Int = entityId.map{id ⇒
+      source.findAllByEntityId(id).foldLeft(0) { (cc, ev) ⇒ eventProcessor(ev); cc + 1}
+    }.getOrElse{
+      source.listAll.foldLeft(0) { (cc, ev) ⇒ eventProcessor(ev); cc + 1}
+    }
+    log.info(s"Finished booting up event sourced actor - ${self.path.name}. Applied $count events")
+  }
 
   val name: String = self.path.name
 
-  val entityId: String
+  implicit val subscriber: ActorRef = self
+
+  implicit val entityId: Option[SID]
+
+  val subscriptions: List[Subscription]
 
   val source: MongoSource[T]
 
-  def eventProcessor: PartialFunction[Event, Unit]
+  val eventProcessor: PartialFunction[Event, Unit]
 
-  def commandProcessor: PartialFunction[Command, List[T]]
+  val commandProcessor: PartialFunction[Command, List[T]]
 
   def receive: Receive = {
     case cmd: Command ⇒
@@ -26,7 +46,7 @@ abstract class EventSourcedActor[T <: Event] extends Actor with ActorLogging {
         val events = commandProcessor(cmd)
         events.foreach(source.save)
         events.foreach(eventProcessor)
-        Receipt(success = true, updated = entityId, message = "OK")
+        Receipt(success = true, updated = entityId.getOrElse("*"), message = "OK")
       } catch {
         case ex: TokTokException ⇒
           Receipt.error(ex)
