@@ -49,6 +49,7 @@ abstract class EventSourcedActor[T <: Event : ClassTag] extends Actor with Actor
         Receipt(success = true, updated = entityId.getOrElse("*"), message = "OK")
       } catch {
         case ex: KrakkenException ⇒
+          log.debug(s"Contingency: $ex")
           Receipt.error(ex)
         case err: Exception ⇒
           log.error(err, s"There was an error when processing command $cmd!")

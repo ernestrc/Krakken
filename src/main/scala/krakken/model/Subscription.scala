@@ -160,6 +160,7 @@ class SubscriptionWorker[A <: Event, B <: Command]
       context.parent.ask(DispatchedEvent(ts, eventObj))
         .mapTo[Receipt]
         .onComplete{
+        //TODO ask instead of tell and rollback if failed?
         case Success(receipt) if receipt.success ⇒ subscriber ! translator(event)
         case Success(receiptFalse) ⇒ logWarn
         case Failure(err) ⇒ logWarn
