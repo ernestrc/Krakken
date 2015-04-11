@@ -1,9 +1,9 @@
-package io.toktok.http
+package krakken.http
 
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.util.Timeout
-import io.toktok.utils.Implicits._
+import krakken.utils.Implicits._
 import spray.httpx.SprayJsonSupport
 import spray.routing._
 
@@ -21,7 +21,7 @@ trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirec
   implicit val timeout: Timeout
   val fallbackTimeout: Timeout
 
-  private [toktok] def __route: Route = {
+  private [krakken] def __route: Route = {
     import system.dispatcher
     /* Check connectivity */
     guardianActorSelection.resolveOne(timeout.duration).onFailure{

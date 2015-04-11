@@ -1,4 +1,4 @@
-name := "toktok_core"
+name := "krakken"
 
 libraryDependencies ++= List(
   "com.typesafe.akka"               %% "akka-actor"             % "2.3.7",

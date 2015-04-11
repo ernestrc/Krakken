@@ -1,13 +1,11 @@
-package io.toktok.dal
+package krakken.dal
 
 import akka.event.LoggingAdapter
 import com.mongodb.casbah.Imports
 import com.mongodb.casbah.Imports._
 import com.novus.salat._
-import io.toktok.model.{Event, SID}
-import io.toktok.utils.Implicits
-import io.toktok.utils.Implicits._
-import unstable.macros.TypeHint
+import krakken.model.{Event, SID, TypeHint}
+import krakken.utils.Implicits._
 
 import scala.reflect.ClassTag
 import scala.util.Try

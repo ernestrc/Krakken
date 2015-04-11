@@ -1,0 +1,35 @@
+# api:
+#     build: ./api
+#     command: python src/init.py dev
+#     ports:
+#         - "80:5000"
+#     volumes:
+#         - ./src:/src
+
+amb:
+    image: cpuguy83/docker-grand-ambassador
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    command: "-name deploy_rs0_1 -name deploy_rs1_1"
+
+rs0:
+    build: ./mongo
+    environment:
+        - RS=deploy_rs0_1
+        - LINK=deploy_rs1_1
+        - PORT=27019
+    links:
+        - "amb:rs1"
+    ports:
+        - "27019:27019"
+
+rs1:
+    build: ./mongo
+    environment:
+        - RS=deploy_rs1_1
+        - LINK=deploy_rs0_1
+        - PORT=27018
+    links:
+        - "amb:rs0"
+    ports:
+        - "27018:27018"

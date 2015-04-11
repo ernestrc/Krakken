@@ -1,8 +1,8 @@
-package io.toktok.http
+package krakken.http
 
 import spray.routing.AuthenticationFailedRejection
 import spray.routing.AuthenticationFailedRejection.CredentialsRejected
-import spray.routing.authentication.{ContextAuthenticator, Authentication}
+import spray.routing.authentication.{Authentication, ContextAuthenticator}
 
 import scala.concurrent.{ExecutionContext, Future}
 

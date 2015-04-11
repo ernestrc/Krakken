@@ -1,11 +1,12 @@
-package io.toktok.model
+package krakken
 
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.IO
-import io.toktok.config.GlobalConfig
-import io.toktok.http.DefaultHttpHandler
-import io.toktok.service.BootedSystem
+import krakken.config.GlobalConfig
+import krakken.http.DefaultHttpHandler
+import krakken.model.EndpointProps
+import krakken.service.BootedSystem
 import spray.can.Http
 
 class MicroService(val name: String,

@@ -1,4 +1,4 @@
-package io.toktok.model
+package krakken.model
 
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor._
@@ -7,8 +7,8 @@ import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
 import com.mongodb.{BasicDBObjectBuilder, Bytes, DBCursor}
 import com.novus.salat.Grater
-import io.toktok.config.GlobalConfig
-import io.toktok.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe, Unsubscribe}
+import krakken.config.GlobalConfig
+import krakken.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe, Unsubscribe}
 import org.bson.types.BSONTimestamp
 
 import scala.reflect.ClassTag

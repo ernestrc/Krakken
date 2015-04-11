@@ -1,7 +1,7 @@
-package io.toktok.model
+package krakken.model
 
 import akka.actor.ActorSystem
-import io.toktok.http.Endpoint
+import krakken.http.Endpoint
 
 import scala.reflect.ClassTag
 

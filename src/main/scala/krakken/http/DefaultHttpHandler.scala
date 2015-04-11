@@ -1,7 +1,7 @@
-package io.toktok.http
+package krakken.http
 
 import akka.actor.{Actor, ActorRefFactory, Props}
-import io.toktok.model.EndpointProps
+import krakken.model.EndpointProps
 import spray.routing.{HttpService, Route}
 
 trait HttpHandler { this: HttpConfig with Actor ⇒

@@ -1,9 +1,9 @@
-package io.toktok.http
+package krakken.http
 
 import akka.actor.ActorRefFactory
 import akka.event.Logging
-import io.toktok.model.Receipt
-import io.toktok.utils.Implicits._
+import krakken.model.Receipt
+import krakken.utils.Implicits._
 import spray.http.StatusCode
 import spray.http.StatusCodes._
 import spray.routing._

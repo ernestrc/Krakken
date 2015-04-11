@@ -1,4 +1,4 @@
-package io.toktok.model
+package krakken.model
 
 import com.novus.salat.global._
 import com.novus.salat.{Grater, _}

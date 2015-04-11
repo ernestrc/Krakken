@@ -1,9 +1,9 @@
-package io.toktok.service
+package krakken.service
 
-import akka.actor.{ActorRef, Actor, ActorLogging}
-import io.toktok.dal.MongoSource
-import io.toktok.model.Exceptions.TokTokException
-import io.toktok.model._
+import akka.actor.{Actor, ActorLogging, ActorRef}
+import krakken.dal.MongoSource
+import krakken.model.Exceptions.KrakkenException
+import krakken.model._
 
 import scala.reflect.ClassTag
 
@@ -48,7 +48,7 @@ abstract class EventSourcedActor[T <: Event : ClassTag] extends Actor with Actor
         events.foreach(eventProcessor)
         Receipt(success = true, updated = entityId.getOrElse("*"), message = "OK")
       } catch {
-        case ex: TokTokException ⇒
+        case ex: KrakkenException ⇒
           Receipt.error(ex)
         case err: Exception ⇒
           log.error(err, s"There was an error when processing command $cmd!")

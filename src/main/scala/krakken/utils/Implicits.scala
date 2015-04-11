@@ -1,13 +1,12 @@
-package io.toktok.utils
+package krakken.utils
 
 import akka.event.LoggingAdapter
 import com.novus.salat.Grater
-import io.toktok.model.SID
+import krakken.model.{TypeHint, InjectedTypeHint, SID}
 import org.bson.types.ObjectId
 import spray.http._
 import spray.httpx.marshalling.Marshaller
 import spray.httpx.unmarshalling.{Deserializer, FromRequestUnmarshaller, Unmarshaller}
-import unstable.macros.{InjectedTypeHint, TypeHint}
 
 object Implicits {
 
