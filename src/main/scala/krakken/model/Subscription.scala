@@ -5,9 +5,11 @@ import akka.actor._
 import akka.util.Timeout
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
+import com.mongodb.casbah.commons.ValidBSONType.ObjectId
 import com.mongodb.{BasicDBObjectBuilder, Bytes, DBCursor}
 import com.novus.salat.Grater
 import krakken.config.GlobalConfig
+import krakken.model.Exceptions.FailedToConsumeSubscription
 import krakken.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe, Unsubscribe}
 import org.bson.types.BSONTimestamp
 
@@ -37,7 +39,7 @@ object SubscriptionMaster {
 
   case object Unsubscribe
   case class Subscribe(cursor: DBCursor)
-  case class DispatchedEvent(ts: BSONTimestamp, event: DBObject)
+  case class DispatchedEvent(ts: ObjectId, event: DBObject)
   case object CursorEmpty
 
 }
@@ -53,7 +55,10 @@ class SubscriptionMaster[A <: Event, B <: Command](
 ) extends Actor with ActorLogging {
 
   override def supervisorStrategy: SupervisorStrategy = OneForOneStrategy(loggingEnabled = true) {
-    case _: Exception => worker ! Subscribe(generateCursor(lastTs)); Restart;
+    case e: Exception =>
+      log.warning(s"Restarting subscription worker. Reason $e")
+      worker ! Subscribe(generateCursor(lastTs))
+      Restart
   }
 
   val initQuery: DBObject = entityId match {
@@ -65,16 +70,16 @@ class SubscriptionMaster[A <: Event, B <: Command](
     case _ ⇒ MongoDBObject("_typeHint" → typeHint)
   }
 
-  val cursorQuery = { ts: BSONTimestamp ⇒
+  val cursorQuery = { ts: ObjectId ⇒
     entityId match {
       case Some(id) ⇒ MongoDBObject(
-        "ts" → MongoDBObject("$gt" → ts),
+        "o._id" → MongoDBObject("$gt" → ts),
         "o._typeHint" → typeHint,
         "o.entityId" → entityId,
         "ns" → MongoDBObject( "$ne" → "toktok.subscriptions")
       )
       case _ ⇒ MongoDBObject(
-        "ts" → MongoDBObject("$gt" → ts),
+        "o._id" → MongoDBObject("$gt" → ts),
         "o._typeHint" → typeHint,
         "ns" → MongoDBObject( "$ne" → "toktok.subscriptions")
       )
@@ -85,13 +90,13 @@ class SubscriptionMaster[A <: Event, B <: Command](
   override def preStart(): Unit = {
     log.debug(s"Subscribing to events in mongodb://$eventSourceHost of type $typeHint")
     lastTs = Try(localColl.underlying.find(initQuery).sort(BasicDBObjectBuilder.start("_id", -1).get())
-      .limit(1).one().as[ObjectId]("_id").getTimestamp) match {
+      .limit(1).one().as[ObjectId]("_id")) match {
       case Success(i) ⇒
         log.debug(s"Found a $typeHint as last inserted in subscriptions with ts $i")
-        new BSONTimestamp(i, 10)
+        i
       case Failure(err) ⇒
         log.debug(s"Did not find any $typeHint in subscription collection. Reason $err")
-        new BSONTimestamp()
+        new ObjectId(new java.util.Date())
     }
     worker ! Subscribe(generateCursor(lastTs))
   }
@@ -101,11 +106,11 @@ class SubscriptionMaster[A <: Event, B <: Command](
   val opLog = subsClient("local")("oplog.rs")
   val localColl = localDb("subscriptions")
 
-  var lastTs: BSONTimestamp = null
+  var lastTs: ObjectId = null
   val worker = context.actorOf(
     Props(classOf[SubscriptionWorker[A,B]], translator, serializer, subscriber))
 
-  def generateCursor(l: BSONTimestamp): DBCursor = {
+  def generateCursor(l: ObjectId): DBCursor = {
     val query = cursorQuery(l)
     val sort = BasicDBObjectBuilder.start("$natural", 1).get()
 
@@ -154,16 +159,17 @@ class SubscriptionWorker[A <: Event, B <: Command]
     while (cursor.hasNext) {
       val dbObjectEvent = cursor.next()
       val eventObj = dbObjectEvent.get("o").asInstanceOf[DBObject]
+      log.debug(s"Cursor retrieved object $eventObj from ops log")
       val event = serializer.asObject(eventObj)
-      val ts = dbObjectEvent.as[BSONTimestamp]("ts")
-      lazy val logWarn = log.error(s"Could not process dispatched subscription event $event!")
-      context.parent.ask(DispatchedEvent(ts, eventObj))
+      val ts = eventObj.as[ObjectId]("_id")
+      subscriber.ask(translator(event))
         .mapTo[Receipt]
         .onComplete{
-        //TODO ask instead of tell and rollback if failed?
-        case Success(receipt) if receipt.success ⇒ subscriber ! translator(event)
-        case Success(receiptFalse) ⇒ logWarn
-        case Failure(err) ⇒ logWarn
+        case Success(receipt) if receipt.success ⇒  context.parent ! DispatchedEvent(ts, eventObj)
+        case Success(receiptFalse) ⇒
+          throw new FailedToConsumeSubscription(new Exception(receiptFalse.message),s"Could not process dispatched subscription event $event!")
+        case Failure(err) ⇒
+          throw new FailedToConsumeSubscription(err, s"Could not process dispatched subscription event $event!")
       }
     }
     context.parent ! CursorEmpty
@@ -171,12 +177,12 @@ class SubscriptionWorker[A <: Event, B <: Command]
   }
 
   override def preStart(): Unit = {
-    log.debug(s"Subscription worker in ${self.path} is ready to rock")
+    log.debug(s"Subscription worker in ${self.path} is ready")
   }
 
   override def receive: Receive = {
     case Subscribe(cur) ⇒
-      log.debug(s"Using tailable cursor $cur...")
+      log.debug(s"Subscribing using tailable cursor $cur...")
       subscribe(cur)
   }
 }

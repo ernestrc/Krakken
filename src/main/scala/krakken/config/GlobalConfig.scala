@@ -10,9 +10,9 @@ object GlobalConfig {
 
   private val config: Config = ConfigFactory.load()
 
-  val mongoHost = config.getString("toktok.source.host")
+  lazy val mongoHost = config.getString("toktok.source.host")
 
-  val mongoDb = config.getString("toktok.source.db")
+  lazy val mongoDb = config.getString("toktok.source.db")
 
   def collectionsHost(collection: String) = config.getString(s"toktok.source.collections.$collection.host")
 

@@ -18,7 +18,7 @@ abstract class EventSourcedActor[T <: Event : ClassTag] extends Actor with Actor
 
   override def preStart(): Unit = {
     log.info(s"Booting up event sourced actor - ${self.path.name}...")
-    val count: Int = entityId.map{id ⇒
+    val count: Int = entityId.map{ id ⇒
       source.findAllByEntityId(id).foldLeft(0) { (cc, ev) ⇒ eventProcessor(ev); cc + 1}
     }.getOrElse{
       source.listAll.foldLeft(0) { (cc, ev) ⇒ eventProcessor(ev); cc + 1}

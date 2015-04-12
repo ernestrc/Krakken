@@ -6,5 +6,6 @@ package krakken.model
 object Exceptions {
 
   abstract class KrakkenException(message: String) extends Exception(message)
+  class FailedToConsumeSubscription(err: Throwable, msg: String) extends KrakkenException(msg)
 
 }
