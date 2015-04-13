@@ -3,7 +3,8 @@ package krakken.http
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.util.Timeout
-import krakken.model.Receipt
+import com.novus.salat.Grater
+import krakken.model.{SID, Receipt}
 import krakken.utils.Implicits._
 import spray.httpx.SprayJsonSupport
 import spray.routing._
@@ -21,7 +22,9 @@ trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirec
   val remoteQueryGuardianPath: String
   def commandGuardianActorSelection: ActorSelection = system.actorSelection(remoteCommandLoc / remoteCommandGuardianPath)
   def queryGuardianActorSelection: ActorSelection = system.actorSelection(remoteQueryLoc / remoteQueryGuardianPath)
-  implicit val receiptGrater = graterMarshallerConverter(Receipt.receiptGrater)
+  def receiptMarshaller[T : Manifest] = graterMarshallerConverter(Receipt.receiptGrater[T])
+  implicit val receiptOfUnitGrater = receiptMarshaller[Unit]
+  implicit val receiptOfSIDGrater = receiptMarshaller[SID]
 
   implicit val timeout: Timeout
   val fallbackTimeout: Timeout

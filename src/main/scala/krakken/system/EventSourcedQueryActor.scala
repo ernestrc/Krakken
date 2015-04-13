@@ -39,16 +39,15 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag] extends Actor with 
 
   val source: MongoSource[T]
 
-  val eventProcessor: PartialFunction[Event, Unit]
+  val eventProcessor: PartialFunction[Event, Any]
 
   val queryProcessor: PartialFunction[Query, View]
 
   def receive:Receive = {
     case e: Event ⇒
-      val receipt: Receipt = try {
+      val receipt: Receipt[_] = try {
         source.save(e.asInstanceOf[T])
-        eventProcessor(e)
-        Receipt(success = true, updated = entityId.getOrElse("*"), message = "OK")
+        Receipt(success = true, updated = Some(eventProcessor(e)), message = "OK")
       } catch {
         case ex: Exception ⇒
           log.error(s"There was an error in QuerySide when processing $e")

@@ -2,13 +2,16 @@ package krakken.utils
 
 import akka.event.LoggingAdapter
 import com.novus.salat.Grater
-import krakken.model.{TypeHint, InjectedTypeHint, SID}
+import krakken.model.{Receipt, TypeHint, InjectedTypeHint, SID}
 import org.bson.types.ObjectId
 import spray.http._
 import spray.httpx.marshalling.Marshaller
 import spray.httpx.unmarshalling.{Deserializer, FromRequestUnmarshaller, Unmarshaller}
 
 object Implicits {
+
+  implicit def pimpedUnit(u: Unit): Receipt[Nothing] =
+    Receipt[Nothing](success= true, None)
 
   implicit class stringPath(root: String){
     def /(path:String):String = root + "/" + path

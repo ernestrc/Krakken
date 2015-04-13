@@ -40,17 +40,16 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag] extends Actor wit
 
   val source: MongoSource[T]
 
-  val eventProcessor: PartialFunction[Event, Unit]
+  val eventProcessor: PartialFunction[Event, Any]
 
   val commandProcessor: PartialFunction[Command, List[T]]
 
   def receive: Receive = {
     case cmd: Command ⇒
-      val receipt: Receipt = try {
+      val receipt: Receipt[_] = try {
         val events = commandProcessor(cmd)
         events.foreach(source.save)
-        events.foreach(eventProcessor)
-        Receipt(success = true, updated = entityId.getOrElse("*"), message = "OK")
+        Receipt(success=true, updated=Some(events.map(eventProcessor).last), message = "OK")
       } catch {
         case ex: KrakkenException ⇒
           log.debug(s"Contingency: $ex")

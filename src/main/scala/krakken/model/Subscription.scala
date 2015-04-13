@@ -130,11 +130,11 @@ class SubscriptionMaster[A <: Event, B](
       sender() ! Subscribe(generateCursor(lastTs))
       log.debug(s"Cursor exhausted. Dispatched a new one")
     case DispatchedEvent(ts, event) ⇒
-      val receipt:Receipt = try {
+      val receipt:Receipt[Nothing] = try {
         localColl.insert(event)
         lastTs = ts
         log.debug(s"Subscription event was saved to subs collection successfully!")
-        Receipt(success=true)
+        Receipt(success=true, updated=None)
       } catch {
         case err: Exception ⇒
           log.error(err, s"Could not insert dispatched subscription event ${event._id} to collection $localColl")
@@ -144,7 +144,7 @@ class SubscriptionMaster[A <: Event, B](
   }
 }
 
-class SubscriptionWorker[A <: Event, B <: Command]
+class SubscriptionWorker[A <: Event, B]
 (translator: A ⇒ B, serializer: Grater[A], subscriber: ActorRef)
   extends Actor with ActorLogging {
   import akka.pattern.ask
@@ -166,7 +166,7 @@ class SubscriptionWorker[A <: Event, B <: Command]
       val event = serializer.asObject(eventObj)
       val ts = eventObj.as[ObjectId]("_id")
       subscriber.ask(translator(event))
-        .mapTo[Receipt]
+        .mapTo[Receipt[_]]
         .onComplete{
         case Success(receipt) if receipt.success ⇒  context.parent ! DispatchedEvent(ts, eventObj)
         case Success(receiptFalse) ⇒

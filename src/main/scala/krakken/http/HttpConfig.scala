@@ -23,7 +23,7 @@ trait HttpConfig {
 
 trait DefaultHttpConfig extends HttpConfig {
 
-  implicit val receiptGrater = graterMarshallerConverter(Receipt.receiptGrater)
+  implicit val receiptGrater = graterMarshallerConverter(Receipt.receiptGrater[Nothing])
 
   implicit def actorRefFactory: ActorRefFactory
 
