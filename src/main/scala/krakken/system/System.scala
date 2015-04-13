@@ -1,4 +1,4 @@
-package krakken.service
+package krakken.system
 
 import akka.actor.ActorSystem
 

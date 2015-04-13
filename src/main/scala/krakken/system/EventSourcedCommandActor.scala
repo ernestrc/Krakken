@@ -1,4 +1,4 @@
-package krakken.service
+package krakken.system
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import krakken.dal.MongoSource
@@ -10,9 +10,13 @@ import scala.reflect.ClassTag
 /**
  * Created by ernest on 4/2/15.
  */
-abstract class EventSourcedActor[T <: Event : ClassTag] extends Actor with ActorLogging {
+abstract class EventSourcedCommandActor[T <: Event : ClassTag] extends Actor with ActorLogging {
 
   override def postStop(): Unit = {
+    subscriptions.foreach(_.unsubscribe())
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     subscriptions.foreach(_.unsubscribe())
   }
 
@@ -52,7 +56,7 @@ abstract class EventSourcedActor[T <: Event : ClassTag] extends Actor with Actor
           log.debug(s"Contingency: $ex")
           Receipt.error(ex)
         case err: Exception ⇒
-          log.error(err, s"There was an error when processing command $cmd!")
+          log.error(err, s"There was an error in CommandSide actor when processing command $cmd!")
           Receipt.error(err)
       }
       sender() ! receipt

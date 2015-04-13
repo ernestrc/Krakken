@@ -16,6 +16,10 @@ object GlobalConfig {
 
   def collectionsHost(collection: String) = config.getString(s"toktok.source.collections.$collection.host")
 
+  def collectionsDB(collection: String) = config.getString(s"toktok.source.collections.$collection.db")
+
+  def collectionsPort(collection: String) = config.getString(s"toktok.source.collections.$collection.port")
+
   val ACTOR_TIMEOUT: FiniteDuration =
     FiniteDuration(config.getDuration("toktok.actors.timeout",
       TimeUnit.SECONDS), TimeUnit.SECONDS)

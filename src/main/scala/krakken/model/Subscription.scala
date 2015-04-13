@@ -5,13 +5,11 @@ import akka.actor._
 import akka.util.Timeout
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
-import com.mongodb.casbah.commons.ValidBSONType.ObjectId
 import com.mongodb.{BasicDBObjectBuilder, Bytes, DBCursor}
 import com.novus.salat.Grater
 import krakken.config.GlobalConfig
 import krakken.model.Exceptions.FailedToConsumeSubscription
-import krakken.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe, Unsubscribe}
-import org.bson.types.BSONTimestamp
+import krakken.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe}
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
@@ -21,33 +19,39 @@ trait Subscription {
 }
 
 //TODO throw exception when non-replicaSet?
-case class AkkaSubscription[A <: Event : ClassTag, B <: Command : ClassTag]
-(serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String)(translator: A ⇒ B)
+case class AkkaSubscription[A <: Event : ClassTag, B : ClassTag]
+(serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String, remoteDbName: String)(translator: A ⇒ B)
 (implicit context: ActorContext, subscriber: ActorRef, entityId: Option[String]) extends Subscription {
 
   val subscribedTo = implicitly[ClassTag[A]].runtimeClass
   val subscribedTypeHint = subscribedTo.getCanonicalName
 
   val master = context.actorOf(Props(classOf[SubscriptionMaster[A,B]],
-    translator, subscribedTypeHint, remoteSourceHost, serializer, entityId, localDb, subscriber))
+    translator, subscribedTypeHint, remoteSourceHost, remoteDbName, serializer, entityId, localDb, subscriber))
 
-  def unsubscribe(): Unit = master ! Unsubscribe
+  def unsubscribe(): Unit = context.stop(master)
 
+}
+
+object AkkaSubscription{
+  def forView[A <: Event : ClassTag](serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String, remoteDbName: String)
+    (implicit context: ActorContext, subscriber: ActorRef, entityId: Option[String]): Subscription =
+    AkkaSubscription[A,A](serializer, localDb, remoteSourceHost, remoteDbName)(a ⇒ a)
 }
 
 object SubscriptionMaster {
 
-  case object Unsubscribe
   case class Subscribe(cursor: DBCursor)
   case class DispatchedEvent(ts: ObjectId, event: DBObject)
   case object CursorEmpty
 
 }
 
-class SubscriptionMaster[A <: Event, B <: Command](
+class SubscriptionMaster[A <: Event, B](
   translator: A ⇒ B,
   typeHint: String,
   remoteSourceHost: String,
+  remoteDbName: String,
   serializer: Grater[A],
   entityId: Option[String],
   localDb: MongoDB,
@@ -76,12 +80,12 @@ class SubscriptionMaster[A <: Event, B <: Command](
         "o._id" → MongoDBObject("$gt" → ts),
         "o._typeHint" → typeHint,
         "o.entityId" → entityId,
-        "ns" → MongoDBObject( "$ne" → "toktok.subscriptions")
+        "ns" → MongoDBObject( "$ne" → s"$remoteDbName.subscriptions")
       )
       case _ ⇒ MongoDBObject(
         "o._id" → MongoDBObject("$gt" → ts),
         "o._typeHint" → typeHint,
-        "ns" → MongoDBObject( "$ne" → "toktok.subscriptions")
+        "ns" → MongoDBObject( "$ne" → s"$remoteDbName.subscriptions")
       )
     }
   }
@@ -137,7 +141,6 @@ class SubscriptionMaster[A <: Event, B <: Command](
           Receipt.error(err)
       }
       sender() ! receipt
-    case Unsubscribe ⇒ context.stop(self)
   }
 }
 

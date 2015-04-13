@@ -10,11 +10,24 @@ import krakken.utils.Implicits._
 import scala.reflect.ClassTag
 import scala.util.Try
 
-/**
- * Created by ernest on 4/1/15.
- */
-class MongoSource[T <: Event : ClassTag](db: MongoDB,
-                                         serializers: PartialFunction[TypeHint, Grater[_ <: T]])
+sealed trait Source[T] {
+
+  def findAllByEntityId(id: SID): List[_ <: T]
+
+  def listAll: List[_ <: T]
+
+  def save[E <: T](event: E): Try[SID]
+
+  def findOneByObjectId[E <: T](id: ObjectId)(implicit tag: ClassTag[E]): Option[E]
+
+  def findAllEventsOfType[E <: T](implicit tag: ClassTag[E]): List[E]
+
+}
+
+
+class MongoSource[T <: Event : ClassTag](val db: MongoDB,
+                                         serializers: PartialFunction[TypeHint, Grater[_ <: T]],
+                                         isView: Boolean = false)
 (implicit log: LoggingAdapter) {
 
   private def fromHintTo[E](mongoObject: Imports.DBObject) = {
@@ -24,7 +37,7 @@ class MongoSource[T <: Event : ClassTag](db: MongoDB,
   }
 
   val runtimeClazz = implicitly[ClassTag[T]].runtimeClass.getSimpleName
-  val collectionT = db(runtimeClazz)
+  val collectionT: MongoCollection = if(isView) db(runtimeClazz + "View") else db(runtimeClazz)
 
   def findAllByEntityId(id: SID): List[_ <: T] = {
     collectionT.find(MongoDBObject("entityId" → id)).toList.map { mongoObject ⇒

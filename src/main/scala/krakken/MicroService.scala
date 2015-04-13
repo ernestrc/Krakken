@@ -6,7 +6,7 @@ import akka.io.IO
 import krakken.config.GlobalConfig
 import krakken.http.DefaultHttpHandler
 import krakken.model.EndpointProps
-import krakken.service.BootedSystem
+import krakken.system.BootedSystem
 import spray.can.Http
 
 class MicroService(val name: String,
