@@ -1,9 +1,11 @@
 package krakken.system
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.event.LoggingAdapter
 import krakken.dal.MongoSource
 import krakken.model.Exceptions.KrakkenException
 import krakken.model._
+import krakken.utils.Implicits._
 
 import scala.reflect.ClassTag
 
@@ -36,11 +38,13 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag] extends Actor wit
 
   implicit val entityId: Option[SID]
 
+  implicit val loggger: LoggingAdapter = log
+
   val subscriptions: List[Subscription]
 
   val source: MongoSource[T]
 
-  val eventProcessor: PartialFunction[Event, Any]
+  val eventProcessor: PartialFunction[Event, Unit]
 
   val commandProcessor: PartialFunction[Command, List[T]]
 
@@ -49,7 +53,10 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag] extends Actor wit
       val receipt: Receipt[_] = try {
         val events = commandProcessor(cmd)
         events.foreach(source.save)
-        Receipt(success=true, updated=Some(events.map(eventProcessor).last), message = "OK")
+        events.foreach(eventProcessor)
+        Receipt(success=true, entity=Some(events.last), message = "OK") Ω { receipt ⇒
+          s"Successfully processed command $cmd and generated ${receipt.entity}"
+        }
       } catch {
         case ex: KrakkenException ⇒
           log.debug(s"Contingency: $ex")

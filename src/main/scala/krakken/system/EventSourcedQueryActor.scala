@@ -1,10 +1,12 @@
 package krakken.system
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.event.LoggingAdapter
 import krakken.dal.MongoSource
 import krakken.model._
 
 import scala.reflect.ClassTag
+import scala.util.Try
 
 /**
  * Created by ernest on 4/12/15.
@@ -33,13 +35,15 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag] extends Actor with 
 
   implicit val subscriber: ActorRef = self
 
+  implicit val loggger: LoggingAdapter = log
+
   implicit val entityId: Option[SID]
 
   val subscriptions: List[Subscription]
 
   val source: MongoSource[T]
 
-  val eventProcessor: PartialFunction[Event, Any]
+  val eventProcessor: PartialFunction[Event, Unit]
 
   val queryProcessor: PartialFunction[Query, View]
 
@@ -47,15 +51,22 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag] extends Actor with 
     case e: Event ⇒
       val receipt: Receipt[_] = try {
         source.save(e.asInstanceOf[T])
-        Receipt(success = true, updated = Some(eventProcessor(e)), message = "OK")
+        Receipt(success = true, entity = Some(eventProcessor(e)), message = "OK")
       } catch {
         case ex: Exception ⇒
           log.error(s"There was an error in QuerySide when processing $e")
           Receipt.error(ex)
       }
       sender() ! receipt
-    case q: Query ⇒ sender() ! queryProcessor(q)
-    case anyElse ⇒ log.error(s"Oops, it looks like I shouldn't have received $anyElse")
+    case q: Query if queryProcessor.isDefinedAt(q) ⇒
+      val receipt: Receipt[_] = Try{
+        queryProcessor(q)
+      }.map{
+        view ⇒ Receipt(success=true, entity=Some(view))
+      }.recover{
+        case e:Exception ⇒ Receipt.error(e)
+      }.get
+      sender() ! receipt
   }
 
 }

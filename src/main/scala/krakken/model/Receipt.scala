@@ -2,6 +2,8 @@ package krakken.model
 
 import com.novus.salat.global._
 import com.novus.salat.{Grater, _}
+import spray.json.DefaultJsonProtocol._
+import spray.json.{JsonFormat, RootJsonFormat}
 
 /**
  * Basic command-side reporting class.
@@ -9,7 +11,7 @@ import com.novus.salat.{Grater, _}
  * @param success Task was successful
  * @param errors List of errors, by default empty.
  */
-case class Receipt[T](success: Boolean, updated: Option[T],
+case class Receipt[T](success: Boolean, entity: Option[T],
                    message: String = "", errors: List[String] = List.empty)
 
 object Receipt {
@@ -25,12 +27,13 @@ object Receipt {
         result.success && receipts.head.success,
         errors = receipts.head.errors ::: result.errors,
         message = result.message + "-" + receipts.head.message,
-        updated = receipts.head.updated)
+        entity = receipts.head.entity)
       receipts = receipts.tail
     }
     result
   }
 
-  implicit def receiptGrater[T : Manifest]: Grater[Receipt[T]] = grater[Receipt[T]]
+  def receiptGrater[T : Manifest]: Grater[Receipt[T]] = grater[Receipt[T]]
+  def receiptFormat[T : JsonFormat]: RootJsonFormat[Receipt[T]] = jsonFormat4(Receipt.apply)
 
 }

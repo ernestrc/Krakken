@@ -134,7 +134,7 @@ class SubscriptionMaster[A <: Event, B](
         localColl.insert(event)
         lastTs = ts
         log.debug(s"Subscription event was saved to subs collection successfully!")
-        Receipt(success=true, updated=None)
+        Receipt(success=true, entity=None)
       } catch {
         case err: Exception ⇒
           log.error(err, s"Could not insert dispatched subscription event ${event._id} to collection $localColl")
