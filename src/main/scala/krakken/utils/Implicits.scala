@@ -1,17 +1,19 @@
 package krakken.utils
 
 import akka.event.LoggingAdapter
-import com.novus.salat.Grater
-import krakken.model.{Receipt, TypeHint, InjectedTypeHint, SID}
+import com.novus.salat.{Grater, _}
+import com.novus.salat.global.ctx
+import krakken.model.Receipt.Empty
+import krakken.model.{InjectedTypeHint, Receipt, SID, TypeHint}
 import org.bson.types.ObjectId
 import spray.http._
-import spray.httpx.marshalling.Marshaller
+import spray.httpx.marshalling.{Marshaller, MarshallingContext}
 import spray.httpx.unmarshalling.{Deserializer, FromRequestUnmarshaller, Unmarshaller}
+import spray.json.{JsonFormat, RootJsonFormat, JsObject}
+
+import scala.concurrent.{ExecutionContext, Future}
 
 object Implicits {
-
-  implicit def pimpedUnit(u: Unit): Receipt[Nothing] =
-    Receipt[Nothing](success= true, None)
 
   implicit class stringPath(root: String){
     def /(path:String):String = root + "/" + path
@@ -25,6 +27,19 @@ object Implicits {
     def Ω(message:T ⇒ String) = {
       log.debug(message(any))
       any
+    }
+  }
+
+  implicit class pimpedFutureOfReceipt(f: Future[Any]){
+    def >>>[T <: AnyRef](implicit ex: ExecutionContext, format: JsonFormat[T], log: LoggingAdapter) : Future[JsObject] = {
+      f.map{ receipt ⇒
+        try receipt.asInstanceOf[Receipt[T]].json
+        catch {
+          case e: Exception ⇒
+            log.warning(e.toString)
+            receipt.asInstanceOf[Receipt[Empty]].json
+        }
+      }
     }
   }
 

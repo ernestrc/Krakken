@@ -3,9 +3,11 @@ package krakken.http
 import akka.actor.ActorRefFactory
 import akka.event.Logging
 import krakken.model.Receipt
-import krakken.utils.Implicits._
+import krakken.model.Receipt.Empty
 import spray.http.StatusCode
 import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport
+import spray.httpx.marshalling.Marshaller
 import spray.routing._
 import spray.util.LoggingContext
 
@@ -21,9 +23,10 @@ trait HttpConfig {
 
 }
 
-trait DefaultHttpConfig extends HttpConfig {
+trait DefaultHttpConfig extends HttpConfig with SprayJsonSupport {
 
-  implicit val receiptGrater = graterMarshallerConverter(Receipt.receiptGrater[Nothing])
+  implicit val receiptGrater: Marshaller[Receipt[Empty]] =
+   Receipt.receiptJsonFormat[Empty]
 
   implicit def actorRefFactory: ActorRefFactory
 

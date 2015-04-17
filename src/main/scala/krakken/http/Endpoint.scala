@@ -6,16 +6,16 @@ import akka.util.Timeout
 import krakken.model.{Receipt, SID}
 import krakken.utils.Implicits._
 import spray.httpx.SprayJsonSupport
-import spray.json.BasicFormats
+import spray.json.{DefaultJsonProtocol, RootJsonFormat, BasicFormats}
 import spray.routing._
 
 /**
  * Http endpoint interface
  */
-trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirectives with BasicFormats{
+trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirectives with DefaultJsonProtocol {
 
   val system: ActorSystem
-  val log: LoggingAdapter = system.log
+  implicit val log: LoggingAdapter = system.log
   val remoteCommandLoc: String
   val remoteQueryLoc: String
   val remoteCommandGuardianPath: String
@@ -23,10 +23,6 @@ trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirec
   def commandGuardianActorSelection: ActorSelection = system.actorSelection(remoteCommandLoc / remoteCommandGuardianPath)
   def queryGuardianActorSelection: ActorSelection = system.actorSelection(remoteQueryLoc / remoteQueryGuardianPath)
 //  def receiptMarshaller[T : Manifest] = graterMarshallerConverter(Receipt.receiptGrater[T])
-//  implicit val receiptOfUnitGrater = receiptMarshaller[Unit]
-//  implicit val receiptOfSIDGrater = receiptMarshaller[SID]
-  implicit val receiptOfSIDMarshaller = Receipt.receiptFormat[SID]
-  implicit val receiptOfUnitMarshaller = Receipt.receiptFormat[Unit]
 
   implicit val timeout: Timeout
   val fallbackTimeout: Timeout

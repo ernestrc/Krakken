@@ -4,7 +4,7 @@ import akka.event.LoggingAdapter
 import com.mongodb.casbah.Imports
 import com.mongodb.casbah.Imports._
 import com.novus.salat._
-import krakken.model.{InjectedTypeHint, Event, SID, TypeHint}
+import krakken.model._
 import krakken.utils.Implicits._
 
 import scala.reflect.ClassTag
@@ -25,11 +25,10 @@ sealed trait Source[T] {
 }
 
 
-class MongoSource[T <: Event : ClassTag](
-  val db: MongoDB,
-  serializers: PartialFunction[TypeHint, Grater[_ <: T]],
-  isView: Boolean = false)
-(implicit log: LoggingAdapter) {
+class MongoSource[T <: Event : ClassTag : FromHintGrater](val db: MongoDB)
+                                                         (implicit log: LoggingAdapter) {
+
+  val serializers = implicitly[FromHintGrater[T]]
 
   private def fromHintTo[E](mongoObject: Imports.DBObject) = {
     serializers(mongoObject.as[String]("_typeHint").toHint)
@@ -38,7 +37,7 @@ class MongoSource[T <: Event : ClassTag](
   }
 
   val runtimeClazz = implicitly[ClassTag[T]].runtimeClass.getSimpleName
-  val collectionT: MongoCollection = if(isView) db(runtimeClazz + "View") else db(runtimeClazz)
+  val collectionT: MongoCollection = db(runtimeClazz)
 
   def findAllByEntityId(id: SID): List[_ <: T] = {
     collectionT.find(MongoDBObject("entityId" → id)).toList.map { mongoObject ⇒

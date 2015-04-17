@@ -5,7 +5,7 @@ import akka.actor._
 import akka.util.Timeout
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
-import com.mongodb.{BasicDBObjectBuilder, Bytes, DBCursor}
+import com.mongodb.{DuplicateKeyException, BasicDBObjectBuilder, Bytes, DBCursor}
 import com.novus.salat.Grater
 import krakken.config.GlobalConfig
 import krakken.model.Exceptions.FailedToConsumeSubscription
@@ -15,6 +15,9 @@ import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 trait Subscription {
+
+  val subscribedTo: Class[_]
+
   def unsubscribe(): Unit
 }
 
@@ -24,7 +27,7 @@ case class AkkaSubscription[A <: Event : ClassTag, B : ClassTag]
 (implicit context: ActorContext, subscriber: ActorRef, entityId: Option[String]) extends Subscription {
 
   val subscribedTo = implicitly[ClassTag[A]].runtimeClass
-  val subscribedTypeHint = subscribedTo.getCanonicalName
+  val subscribedTypeHint = InjectedTypeHint(subscribedTo.getCanonicalName)
 
   val master = context.actorOf(Props(classOf[SubscriptionMaster[A,B]],
     translator, subscribedTypeHint, remoteSourceHost, remoteDbName, serializer, entityId, localDb, subscriber))
@@ -49,7 +52,7 @@ object SubscriptionMaster {
 
 class SubscriptionMaster[A <: Event, B](
   translator: A ⇒ B,
-  typeHint: String,
+  typeHint: TypeHint,
   remoteSourceHost: String,
   remoteDbName: String,
   serializer: Grater[A],
@@ -68,24 +71,27 @@ class SubscriptionMaster[A <: Event, B](
   val initQuery: DBObject = entityId match {
     case Some(id) ⇒
       MongoDBObject(
-        "_typeHint" → typeHint,
+        "_typeHint" → typeHint.hint,
         "entityId" → entityId
       )
-    case _ ⇒ MongoDBObject("_typeHint" → typeHint)
+    case _ ⇒ MongoDBObject("_typeHint" → typeHint.hint)
   }
 
   val cursorQuery = { ts: ObjectId ⇒
     entityId match {
       case Some(id) ⇒ MongoDBObject(
         "o._id" → MongoDBObject("$gt" → ts),
-        "o._typeHint" → typeHint,
+        "o._typeHint" → typeHint.hint,
         "o.entityId" → entityId,
-        "ns" → MongoDBObject( "$ne" → s"$remoteDbName.subscriptions")
+        "ns" → MongoDBObject( "$ne" →
+          s"${localDb.getName}.${classOf[Subscription].getSimpleName}"
+        )
       )
       case _ ⇒ MongoDBObject(
         "o._id" → MongoDBObject("$gt" → ts),
-        "o._typeHint" → typeHint,
-        "ns" → MongoDBObject( "$ne" → s"$remoteDbName.subscriptions")
+        "o._typeHint" → typeHint.hint,
+        "ns" → MongoDBObject("$ne" →
+          s"${localDb.getName}.${classOf[Subscription].getSimpleName}")
       )
     }
   }
@@ -108,7 +114,7 @@ class SubscriptionMaster[A <: Event, B](
   val eventSourceHost: String = remoteSourceHost
   val subsClient = MongoClient(eventSourceHost)
   val opLog = subsClient("local")("oplog.rs")
-  val localColl = localDb("subscriptions")
+  val localColl = localDb(classOf[Subscription].getSimpleName)
 
   var lastTs: ObjectId = null
   val worker = context.actorOf(
@@ -117,6 +123,8 @@ class SubscriptionMaster[A <: Event, B](
   def generateCursor(l: ObjectId): DBCursor = {
     val query = cursorQuery(l)
     val sort = BasicDBObjectBuilder.start("$natural", 1).get()
+
+    log.debug(s"SubscriptionMaster of ${typeHint.hint} generated query cursor $query")
 
     opLog.underlying
       .find(query)
@@ -130,12 +138,15 @@ class SubscriptionMaster[A <: Event, B](
       sender() ! Subscribe(generateCursor(lastTs))
       log.debug(s"Cursor exhausted. Dispatched a new one")
     case DispatchedEvent(ts, event) ⇒
-      val receipt:Receipt[Nothing] = try {
+      val receipt:Receipt[_] = try {
         localColl.insert(event)
         lastTs = ts
         log.debug(s"Subscription event was saved to subs collection successfully!")
-        Receipt(success=true, entity=None)
+        Receipt(success=true, entity=event)
       } catch {
+        case err: DuplicateKeyException ⇒
+          log.debug("Could not insert subscription because it was already inserted")
+          Receipt(success=true, entity=event)
         case err: Exception ⇒
           log.error(err, s"Could not insert dispatched subscription event ${event._id} to collection $localColl")
           Receipt.error(err)

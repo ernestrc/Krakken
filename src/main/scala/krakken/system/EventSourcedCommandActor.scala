@@ -2,6 +2,8 @@ package krakken.system
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingAdapter
+import com.mongodb.casbah.MongoClient
+import krakken.config.GlobalConfig
 import krakken.dal.MongoSource
 import krakken.model.Exceptions.KrakkenException
 import krakken.model._
@@ -12,7 +14,7 @@ import scala.reflect.ClassTag
 /**
  * Created by ernest on 4/2/15.
  */
-abstract class EventSourcedCommandActor[T <: Event : ClassTag] extends Actor with ActorLogging {
+abstract class EventSourcedCommandActor[T <: Event : ClassTag : FromHintGrater] extends Actor with ActorLogging {
 
   override def postStop(): Unit = {
     subscriptions.foreach(_.unsubscribe())
@@ -38,10 +40,12 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag] extends Actor wit
 
   implicit val entityId: Option[SID]
 
-  implicit val loggger: LoggingAdapter = log
+  implicit val logger: LoggingAdapter = log
 
   val subscriptions: List[Subscription]
 
+  val client = MongoClient(GlobalConfig.mongoHost)
+  val db = client(GlobalConfig.mongoDb)
   val source: MongoSource[T]
 
   val eventProcessor: PartialFunction[Event, Unit]
@@ -54,7 +58,7 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag] extends Actor wit
         val events = commandProcessor(cmd)
         events.foreach(source.save)
         events.foreach(eventProcessor)
-        Receipt(success=true, entity=Some(events.last), message = "OK") Ω { receipt ⇒
+        Receipt(success=true, entity=events.last, message = "OK") Ω { receipt ⇒
           s"Successfully processed command $cmd and generated ${receipt.entity}"
         }
       } catch {
