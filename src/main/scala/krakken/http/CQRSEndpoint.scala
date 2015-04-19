@@ -14,7 +14,24 @@ import scala.concurrent.{ExecutionContext, Future}
 /**
  * Http endpoint interface
  */
-trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirectives with DefaultJsonProtocol {
+trait KrakkenEndpoint extends Directives
+with SprayJsonSupport with AuthenticationDirectives with DefaultJsonProtocol {
+
+  val system: ActorSystem
+
+  def $route: Route
+}
+
+trait Endpoint extends KrakkenEndpoint {
+
+  val system: ActorSystem
+
+  def $route: Route = route
+
+  def route: Route
+}
+
+trait CQRSEndpoint extends KrakkenEndpoint {
 
   val system: ActorSystem
   implicit val log: LoggingAdapter = system.log
@@ -27,12 +44,10 @@ trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirec
 
   def queryGuardianActorSelection: ActorSelection = system.actorSelection(remoteQueryLoc / remoteQueryGuardianPath)
 
-  //  def receiptMarshaller[T : Manifest] = graterMarshallerConverter(Receipt.receiptGrater[T])
-
   implicit val timeout: Timeout
   val fallbackTimeout: Timeout
 
-  private[krakken] def __route: Route = {
+  def $route: Route = {
     import system.dispatcher
     /* Check connectivity */
     (commandGuardianActorSelection :: queryGuardianActorSelection :: Nil).foreach(_.resolveOne(timeout.duration).onFailure {
@@ -72,7 +87,6 @@ trait Endpoint extends Directives with SprayJsonSupport with AuthenticationDirec
           commandGuardianActorSelection.ask(query)
       }
     }
-
   }
 
 }

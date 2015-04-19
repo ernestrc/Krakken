@@ -1,16 +1,16 @@
 package krakken.utils
 
 import akka.event.LoggingAdapter
-import com.novus.salat.{Grater, _}
-import krakken.model.ctx
+import com.mongodb.DBObject
+import com.mongodb.casbah.commons.MongoDBObject
+import com.novus.salat.Grater
 import krakken.model.Receipt.Empty
-import krakken.model.TypeHint
-import krakken.model._
+import krakken.model.{TypeHint, _}
 import org.bson.types.ObjectId
 import spray.http._
-import spray.httpx.marshalling.{Marshaller, MarshallingContext}
+import spray.httpx.marshalling.Marshaller
 import spray.httpx.unmarshalling.{Deserializer, FromRequestUnmarshaller, Unmarshaller}
-import spray.json.{JsonFormat, RootJsonFormat, JsObject}
+import spray.json._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -46,6 +46,25 @@ object Implicits {
         }
       }
     }
+  }
+
+  private [krakken] def deserialize(value:JsValue):Any = {
+    value match {
+      case JsBoolean(x) ⇒ x
+      case JsString(x) ⇒ x
+      case JsNumber(x) ⇒ x.toLong
+      case JsNull ⇒ None
+      case JsArray(x) ⇒ x.foldLeft(List.empty[Any]){ (acc, y) ⇒
+        (y match {
+          case js: JsObject ⇒ jsonToBson(js)
+          case lse ⇒ deserialize(lse)
+        }) :: acc }
+      case ob @ JsObject(x) ⇒ jsonToBson(ob)
+    }
+  }
+
+  implicit def jsonToBson(json: JsObject): DBObject = {
+    MongoDBObject(json.fields.map(kv ⇒ kv._1 → deserialize(kv._2)).toList)
   }
 
   implicit class pimpedSID(id: SID){

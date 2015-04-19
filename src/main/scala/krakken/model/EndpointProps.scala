@@ -1,29 +1,29 @@
 package krakken.model
 
 import akka.actor.ActorSystem
-import krakken.http.Endpoint
+import krakken.http.{KrakkenEndpoint, CQRSEndpoint}
 
 import scala.reflect.ClassTag
 
 abstract class EndpointProps(val clazz: Class[_], val args: Any*) {
 
-  def boot: (ActorSystem) ⇒ Endpoint
+  def boot: (ActorSystem) ⇒ KrakkenEndpoint
 
 }
 
 object EndpointProps{
 
-  def apply[T <: Endpoint : ClassTag](args: Any*): EndpointProps =
+  def apply[T <: KrakkenEndpoint : ClassTag](args: Any*): EndpointProps =
     new EndpointProps(implicitly[ClassTag[T]].runtimeClass){
-      override def boot = { implicit ctx ⇒
-        clazz.getConstructors()(0).newInstance(ctx, args).asInstanceOf[Endpoint]
+      override def boot = { implicit sys ⇒
+        clazz.getConstructors()(0).newInstance(sys, args).asInstanceOf[KrakkenEndpoint]
       }
     }
 
-  def apply[T <: Endpoint : ClassTag]: EndpointProps =
+  def apply[T <: KrakkenEndpoint : ClassTag]: EndpointProps =
     new EndpointProps(implicitly[ClassTag[T]].runtimeClass){
-      override def boot = { implicit ctx ⇒
-        clazz.getConstructors()(0).newInstance(ctx).asInstanceOf[Endpoint]
+      override def boot = { implicit sys ⇒
+        clazz.getConstructors()(0).newInstance(sys).asInstanceOf[KrakkenEndpoint]
       }
     }
 

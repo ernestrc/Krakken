@@ -20,8 +20,8 @@ class DefaultHttpHandler(val endpointProps: List[EndpointProps])
 //  val authenticationProvider: AuthenticationProvider = new TokenAuthentication
 
   val routes: Route = /*authenticationProvider.actionContext { ctx ⇒*/
-    endpointProps.tail.foldLeft(endpointProps.head.boot(context.system).__route) {
-      (chain, next) ⇒ chain ~ next.boot(context.system).__route
+    endpointProps.tail.foldLeft(endpointProps.head.boot(context.system).$route) {
+      (chain, next) ⇒ chain ~ next.boot(context.system).$route
     }
   //}
 
