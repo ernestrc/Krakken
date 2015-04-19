@@ -16,12 +16,13 @@ import scala.reflect.ClassTag
  */
 abstract class EventSourcedCommandActor[T <: Event : ClassTag : FromHintGrater] extends Actor with ActorLogging {
 
+
   override def postStop(): Unit = {
     subscriptions.foreach(_.unsubscribe())
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    subscriptions.foreach(_.unsubscribe())
+    subscriptions.foreach(_.subscribe)
   }
 
   override def preStart(): Unit = {
@@ -32,6 +33,7 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag : FromHintGrater] 
       source.listAll.foldLeft(0) { (cc, ev) ⇒ eventProcessor(ev); cc + 1}
     }
     log.info(s"Finished booting up event sourced actor - ${self.path.name}. Applied $count events")
+    subscriptions.foreach(_.subscribe())
   }
 
   val name: String = self.path.name
@@ -54,6 +56,7 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag : FromHintGrater] 
 
   def receive: Receive = {
     case cmd: Command ⇒
+      log.debug("{} received command {}", self.path.name, cmd)
       val receipt: Receipt[_] = try {
         val events = commandProcessor(cmd)
         events.foreach(source.save)

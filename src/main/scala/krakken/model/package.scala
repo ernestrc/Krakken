@@ -1,11 +1,13 @@
 package krakken
 
-import com.novus.salat.Grater
+import com.novus.salat._
 
-/**
- * Created by ernest on 4/4/15.
- */
 package object model {
+
+  implicit val ctx = new Context {
+    val name = "Always Hint"
+    override val typeHintStrategy = StringTypeHintStrategy(when = TypeHintFrequency.Always)
+  }
 
   type FromHintGrater[T <: AnyRef] = PartialFunction[TypeHint, Grater[_ <: T]]
 

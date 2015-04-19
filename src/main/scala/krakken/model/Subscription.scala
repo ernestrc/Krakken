@@ -19,6 +19,7 @@ trait Subscription {
   val subscribedTo: Class[_]
 
   def unsubscribe(): Unit
+  def subscribe(): Unit
 }
 
 //TODO throw exception when non-replicaSet?
@@ -26,13 +27,28 @@ case class AkkaSubscription[A <: Event : ClassTag, B : ClassTag]
 (serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String, remoteDbName: String)(translator: A ⇒ B)
 (implicit context: ActorContext, subscriber: ActorRef, entityId: Option[String]) extends Subscription {
 
+  private var isAlive = false
+
   val subscribedTo = implicitly[ClassTag[A]].runtimeClass
   val subscribedTypeHint = InjectedTypeHint(subscribedTo.getCanonicalName)
 
-  val master = context.actorOf(Props(classOf[SubscriptionMaster[A,B]],
-    translator, subscribedTypeHint, remoteSourceHost, remoteDbName, serializer, entityId, localDb, subscriber))
+  private var master = context.system.deadLetters
 
-  def unsubscribe(): Unit = context.stop(master)
+  def unsubscribe(): Unit = {
+    if(isAlive) {
+      context.stop(master)
+      isAlive = false
+    }
+  }
+  def subscribe(): Unit = {
+    if(isAlive) {
+      context.stop(master)
+    }
+    context.system.log.debug("AkkaSubscription starting subscription process now...")
+    master = context.actorOf(Props(classOf[SubscriptionMaster[A,B]],
+      translator, subscribedTypeHint, remoteSourceHost, remoteDbName, serializer, entityId, localDb, subscriber))
+    isAlive = true
+  }
 
 }
 
@@ -102,11 +118,11 @@ class SubscriptionMaster[A <: Event, B](
     lastTs = Try(localColl.underlying.find(initQuery).sort(BasicDBObjectBuilder.start("_id", -1).get())
       .limit(1).one().as[ObjectId]("_id")) match {
       case Success(i) ⇒
-        log.debug(s"Found a $typeHint as last inserted in subscriptions with ts $i")
+        log.debug("Found a {} as last inserted in subscriptions with ts {}", typeHint, i)
         i
       case Failure(err) ⇒
-        log.debug(s"Did not find any $typeHint in subscription collection. Reason $err")
-        new ObjectId(new java.util.Date())
+        log.debug("Did not find any {} in subscription collection. Reason {}", typeHint, err)
+        new ObjectId(new java.util.Date(1))
     }
     worker ! Subscribe(generateCursor(lastTs))
   }
@@ -124,7 +140,7 @@ class SubscriptionMaster[A <: Event, B](
     val query = cursorQuery(l)
     val sort = BasicDBObjectBuilder.start("$natural", 1).get()
 
-    log.debug(s"SubscriptionMaster of ${typeHint.hint} generated query cursor $query")
+    log.debug("SubscriptionMaster of {} generated query cursor {}", typeHint.hint, query)
 
     opLog.underlying
       .find(query)

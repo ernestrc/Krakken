@@ -46,7 +46,9 @@ class MongoSource[T <: Event : ClassTag : FromHintGrater](val db: MongoDB)
   }
 
   def listAll: List[_ <: T] = {
-    collectionT.find().toList.map { mongoObject ⇒
+    val l = collectionT.find().toList
+    log.debug("ListAll method in MongoSource retrieved {}", l.toString)
+    l.map { mongoObject ⇒
       serializers(mongoObject.as[String]("_typeHint").toHint).asObject(mongoObject)
     }
   }

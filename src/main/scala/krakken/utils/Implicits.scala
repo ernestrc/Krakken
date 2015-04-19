@@ -2,9 +2,10 @@ package krakken.utils
 
 import akka.event.LoggingAdapter
 import com.novus.salat.{Grater, _}
-import com.novus.salat.global.ctx
+import krakken.model.ctx
 import krakken.model.Receipt.Empty
-import krakken.model.{InjectedTypeHint, Receipt, SID, TypeHint}
+import krakken.model.TypeHint
+import krakken.model._
 import org.bson.types.ObjectId
 import spray.http._
 import spray.httpx.marshalling.{Marshaller, MarshallingContext}
@@ -30,13 +31,17 @@ object Implicits {
     }
   }
 
+  implicit class pimpedFromHintGrater(a: PartialFunction[TypeHint, Grater[_]]){
+    def ~(b: PartialFunction[TypeHint, Grater[_]]):PartialFunction[TypeHint, Grater[_]] = a.orElse(b)
+  }
+
   implicit class pimpedFutureOfReceipt(f: Future[Any]){
     def >>>[T <: AnyRef](implicit ex: ExecutionContext, format: JsonFormat[T], log: LoggingAdapter) : Future[JsObject] = {
       f.map{ receipt ⇒
         try receipt.asInstanceOf[Receipt[T]].json
         catch {
           case e: Exception ⇒
-            log.warning(e.toString)
+            log.debug("PimpedFutureOfReceipt >>> method try catched and.. {}", e.toString)
             receipt.asInstanceOf[Receipt[Empty]].json
         }
       }

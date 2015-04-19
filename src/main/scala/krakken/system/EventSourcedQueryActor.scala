@@ -21,7 +21,7 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] ex
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    subscriptions.foreach(_.unsubscribe())
+    subscriptions.foreach(_.subscribe())
   }
 
   override def preStart(): Unit = {
@@ -29,6 +29,7 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] ex
     val count: Int =
       $source.foldLeft(0) { (cc, ev) ⇒ eventProcessor(ev.asInstanceOf[Event]); cc + 1}
     log.info(s"Finished booting up event sourced QUERY actor - ${self.path.name}. Applied $count events")
+    subscriptions.foreach(_.subscribe())
   }
 
   val name: String = self.path.name

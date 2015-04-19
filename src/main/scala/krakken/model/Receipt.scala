@@ -1,7 +1,6 @@
 package krakken.model
 
-import com.novus.salat.global._
-import com.novus.salat.{Grater, _}
+import com.novus.salat._
 import spray.json.DefaultJsonProtocol._
 import spray.json.{JsObject, JsonFormat, RootJsonFormat}
 
