@@ -47,7 +47,8 @@ trait CQRSEndpoint extends KrakkenEndpoint {
   implicit val timeout: Timeout
   val fallbackTimeout: Timeout
 
-  def $route: Route = {
+  def $route: Route = { ctx: RequestContext ⇒
+    log.debug("{} received request {}", this.getClass.getSimpleName, ctx.request)
     import system.dispatcher
     /* Check connectivity */
     (commandGuardianActorSelection :: queryGuardianActorSelection :: Nil).foreach(_.resolveOne(timeout.duration).onFailure {
@@ -56,7 +57,7 @@ trait CQRSEndpoint extends KrakkenEndpoint {
           "AND GATEWAY. COWARDLY SHUTTING DOWN NOW")
         system.shutdown()
     })
-    route(commandGuardianActorSelection, queryGuardianActorSelection)
+    route(commandGuardianActorSelection, queryGuardianActorSelection)(ctx)
   }
 
   val route: (ActorSelection, ActorSelection) ⇒ Route

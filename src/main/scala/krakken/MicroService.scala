@@ -3,7 +3,7 @@ package krakken
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.IO
-import krakken.config.GlobalConfig
+import krakken.config.KrakkenConfig
 import krakken.http.DefaultHttpHandler
 import krakken.model.EndpointProps
 import krakken.system.BootedSystem
@@ -21,7 +21,7 @@ class MicroService(val name: String,
 
   def initActorSystem(): Unit = {
     actorsProps.foreach( props ⇒ system.actorOf(props, props.actorClass().getSimpleName))
-    log.info(s"$name actor system is listening on ${GlobalConfig.akkaRemoteHost}:${GlobalConfig.akkaRemotePort}")
+    log.info(s"$name actor system is up and running")
   }
 
   def initHttpServer(p: Int, h:String, handler: Props): Unit = {

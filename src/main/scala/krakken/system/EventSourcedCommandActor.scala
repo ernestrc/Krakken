@@ -3,7 +3,7 @@ package krakken.system
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingAdapter
 import com.mongodb.casbah.MongoClient
-import krakken.config.GlobalConfig
+import krakken.config.KrakkenConfig
 import krakken.dal.MongoSource
 import krakken.model.Exceptions.KrakkenException
 import krakken.model._
@@ -46,8 +46,6 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag : FromHintGrater] 
 
   val subscriptions: List[Subscription]
 
-  val client = MongoClient(GlobalConfig.mongoHost)
-  val db = client(GlobalConfig.mongoDb)
   val source: MongoSource[T]
 
   val eventProcessor: PartialFunction[Event, Unit]

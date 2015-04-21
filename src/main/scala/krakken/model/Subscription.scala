@@ -5,9 +5,9 @@ import akka.actor._
 import akka.util.Timeout
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
-import com.mongodb.{DuplicateKeyException, BasicDBObjectBuilder, Bytes, DBCursor}
+import com.mongodb.{BasicDBObjectBuilder, Bytes, DBCursor, DuplicateKeyException}
 import com.novus.salat.Grater
-import krakken.config.GlobalConfig
+import krakken.config.GlobalKrakkenConfig
 import krakken.model.Exceptions.FailedToConsumeSubscription
 import krakken.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe}
 
@@ -181,7 +181,7 @@ class SubscriptionWorker[A <: Event, B]
     if (currentCursor != null) currentCursor.close()
   }
 
-  implicit val timeout: Timeout = GlobalConfig.ACTOR_TIMEOUT
+  implicit val timeout: Timeout = GlobalKrakkenConfig.ACTOR_TIMEOUT
   var currentCursor: DBCursor = null
 
   def subscribe(cursor: DBCursor): Unit = {

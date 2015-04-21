@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingAdapter
 import com.mongodb.casbah.MongoClient
 import com.mongodb.casbah.commons.MongoDBObject
-import krakken.config.GlobalConfig
+import krakken.config.KrakkenConfig
 import krakken.model._
 
 import scala.reflect.ClassTag
@@ -32,16 +32,17 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] ex
     subscriptions.foreach(_.subscribe())
   }
 
-  val name: String = self.path.name
-
-  val client = MongoClient(GlobalConfig.mongoHost)
-  val db = client(GlobalConfig.mongoDb)
-  val subs = db(classOf[Subscription].getSimpleName)
-  val subscriptionSerializers: FromHintGrater[AnyRef]
-
   implicit val entityId: Option[SID]
 
-  def $source = subs.find(sourceQuery).toList.map{ mongoObject ⇒
+  val name: String = self.path.name
+
+  val subscriptions: List[Subscription]
+  lazy val subscriptionsColl: MongoCollection = db(classOf[Subscription].getSimpleName)
+  val subscriptionSerializers: FromHintGrater[AnyRef]
+
+  val db: MongoDB
+
+  def $source = subscriptionsColl.find(sourceQuery).toList.map{ mongoObject ⇒
     val hint = mongoObject.as[String]("_typeHint").toHint
     subscriptionSerializers.apply(hint).asObject(mongoObject)
   }
@@ -59,7 +60,6 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] ex
 
   implicit val logger: LoggingAdapter = log
 
-  val subscriptions: List[Subscription]
 
   val eventProcessor: PartialFunction[Event, Unit]
 
