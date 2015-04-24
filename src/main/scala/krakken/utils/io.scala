@@ -23,7 +23,7 @@ object io {
   case class Container(host: Host, port: Int)
 
   def getContainerLink(name: String): Option[Container] = Try {
-    lazy val connection = System.getenv(s"${name}_PORT").split(':')
+    lazy val connection = System.getenv(s"${name.toUpperCase}_PORT").split(':')
     lazy val port:Int = connection.last.toInt
     loadHosts().find(_.alias == name).map{ host ⇒
       Container(host, port)
