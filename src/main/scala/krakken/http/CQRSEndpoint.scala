@@ -5,7 +5,9 @@ import akka.event.LoggingAdapter
 import akka.util.Timeout
 import krakken.model.{Query, Command, Receipt, SID}
 import krakken.utils.Implicits._
+import spray.http.HttpHeaders._
 import spray.httpx.SprayJsonSupport
+import spray.http.ContentTypes._
 import spray.json.{DefaultJsonProtocol, RootJsonFormat, BasicFormats}
 import spray.routing._
 
@@ -53,9 +55,7 @@ trait CQRSEndpoint extends KrakkenEndpoint {
     /* Check connectivity */
     (commandGuardianActorSelection :: queryGuardianActorSelection :: Nil).foreach(_.resolveOne(timeout.duration).onFailure {
       case e: Exception ⇒
-        log.error(e, "THERE IS NO CONNECTIVITY BETWEEN REMOTE ACTOR SYSTEM " +
-          "AND GATEWAY. COWARDLY SHUTTING DOWN NOW")
-        system.shutdown()
+        log.warning("THERE IS NO CONNECTIVITY BETWEEN GATEWAY AND REMOTE ACTOR SYSTEMS: {}", e)
     })
     route(commandGuardianActorSelection, queryGuardianActorSelection)(ctx)
   }
