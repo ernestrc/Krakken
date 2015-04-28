@@ -11,13 +11,15 @@ import scala.concurrent.duration.FiniteDuration
 class KrakkenConfig {
 
   val log = LoggerFactory.getLogger(this.getClass)
-
-  implicit class containerToAkkaUrl(s: Container) {
-    def toAkkaUrl: String =
-      s"akka.tcp://${s.host.alias}@${s.host.ip}:${s.port}/user"
-  }
   
   protected val config: Config = ConfigFactory.load()
+
+  /* lazy not ideal, but necessary to give a bit more flexibility
+  * in case a source is not needed */
+  lazy val dataContainer = config.getString("krakken.source.container")
+  lazy val mongoHost: String = config.getString("krakken.source.host")
+  lazy val mongoPort: Int = config.getInt("krakken.source.port")
+  lazy val dbName = config.getString("krakken.source.db")
 
   def collectionsDB(collection: String) = config.getString(s"krakken.source.collections.$collection.db")
 

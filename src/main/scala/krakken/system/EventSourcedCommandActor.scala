@@ -3,11 +3,12 @@ package krakken.system
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingAdapter
 import com.mongodb.casbah.MongoClient
-import krakken.config.KrakkenConfig
+import krakken.config.GlobalKrakkenConfig
 import krakken.dal.MongoSource
 import krakken.model.Exceptions.KrakkenException
 import krakken.model._
 import krakken.utils.Implicits._
+import krakken.utils.io._
 
 import scala.reflect.ClassTag
 
@@ -44,9 +45,15 @@ abstract class EventSourcedCommandActor[T <: Event : ClassTag : FromHintGrater] 
 
   implicit val logger: LoggingAdapter = log
 
-  val subscriptions: List[Subscription]
+  val mongoContainer = getContainerLink(GlobalKrakkenConfig.dataContainer)
+  val mongoHost: String =  mongoContainer.map(_.host.ip).getOrElse(GlobalKrakkenConfig.mongoHost)
+  val mongoPort: Int = mongoContainer.map(_.port).getOrElse(GlobalKrakkenConfig.mongoPort)
+  val dbName: String = GlobalKrakkenConfig.dbName
+  log.debug("{} container linked -> {}", GlobalKrakkenConfig.dataContainer, mongoContainer)
+  val db = MongoClient(mongoHost, mongoPort)(dbName)
+  val source = new MongoSource[T](db)
 
-  val source: MongoSource[T]
+  val subscriptions: List[Subscription]
 
   val eventProcessor: PartialFunction[Event, Unit]
 

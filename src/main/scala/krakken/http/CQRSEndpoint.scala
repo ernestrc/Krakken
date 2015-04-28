@@ -21,12 +21,16 @@ with SprayJsonSupport with AuthenticationDirectives with DefaultJsonProtocol {
 
   val system: ActorSystem
 
+  val remoteActors : List[ActorSelection]
+
   def $route: Route
 }
 
 trait Endpoint extends KrakkenEndpoint {
 
   val system: ActorSystem
+
+  val remoteActors = List.empty[ActorSelection]
 
   def $route: Route = route
 
@@ -42,6 +46,10 @@ trait CQRSEndpoint extends KrakkenEndpoint {
   val remoteCommandGuardianPath: String
   val remoteQueryGuardianPath: String
 
+
+  override val remoteActors: List[ActorSelection] =
+    commandGuardianActorSelection :: queryGuardianActorSelection :: Nil
+
   def commandGuardianActorSelection: ActorSelection = system.actorSelection(remoteCommandLoc / remoteCommandGuardianPath)
 
   def queryGuardianActorSelection: ActorSelection = system.actorSelection(remoteQueryLoc / remoteQueryGuardianPath)
@@ -52,11 +60,6 @@ trait CQRSEndpoint extends KrakkenEndpoint {
   def $route: Route = { ctx: RequestContext ⇒
     log.debug("{} received request {}", this.getClass.getSimpleName, ctx.request)
     import system.dispatcher
-    /* Check connectivity */
-    (commandGuardianActorSelection :: queryGuardianActorSelection :: Nil).foreach(_.resolveOne(timeout.duration).onFailure {
-      case e: Exception ⇒
-        log.warning("THERE IS NO CONNECTIVITY BETWEEN GATEWAY AND REMOTE ACTOR SYSTEMS: {}", e)
-    })
     route(commandGuardianActorSelection, queryGuardianActorSelection)(ctx)
   }
 

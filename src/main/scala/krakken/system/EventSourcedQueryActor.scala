@@ -2,14 +2,15 @@ package krakken.system
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingAdapter
+import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
 import com.mongodb.casbah.commons.MongoDBObject
-import krakken.config.KrakkenConfig
+import krakken.config.GlobalKrakkenConfig
 import krakken.model._
+import krakken.utils.io._
 
 import scala.reflect.ClassTag
 import scala.util.Try
-import com.mongodb.casbah.Imports._
 
 /**
  * Created by ernest on 4/12/15.
@@ -32,6 +33,13 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] ex
     subscriptions.foreach(_.subscribe())
   }
 
+  val mongoContainer = getContainerLink(GlobalKrakkenConfig.dataContainer)
+  val mongoHost: String =  mongoContainer.map(_.host.ip).getOrElse(GlobalKrakkenConfig.mongoHost)
+  val mongoPort: Int = mongoContainer.map(_.port).getOrElse(GlobalKrakkenConfig.mongoPort)
+  val dbName: String = GlobalKrakkenConfig.dbName
+  log.debug("{} container linked -> {}", GlobalKrakkenConfig.dataContainer, mongoContainer)
+  val db = MongoClient(mongoHost, mongoPort)(dbName)
+
   implicit val entityId: Option[SID]
 
   val name: String = self.path.name
@@ -39,8 +47,6 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] ex
   val subscriptions: List[Subscription]
   lazy val subscriptionsColl: MongoCollection = db(classOf[Subscription].getSimpleName)
   val subscriptionSerializers: FromHintGrater[AnyRef]
-
-  val db: MongoDB
 
   def $source = subscriptionsColl.find(sourceQuery).toList.map{ mongoObject ⇒
     val hint = mongoObject.as[String]("_typeHint").toHint
