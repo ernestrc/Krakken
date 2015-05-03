@@ -5,7 +5,7 @@ import com.mongodb.DBObject
 import com.mongodb.casbah.commons.MongoDBObject
 import com.novus.salat.Grater
 import krakken.model.Receipt.Empty
-import krakken.model.{TypeHint, _}
+import krakken.model._
 import org.bson.types.ObjectId
 import spray.http._
 import spray.httpx.marshalling.Marshaller

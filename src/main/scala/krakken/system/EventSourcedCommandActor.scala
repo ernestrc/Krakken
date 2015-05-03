@@ -4,11 +4,12 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingAdapter
 import com.mongodb.casbah.MongoClient
 import krakken.config.GlobalKrakkenConfig
-import krakken.dal.MongoSource
+import krakken.dal.{Subscription, MongoSource}
+import krakken.io
 import krakken.model.Exceptions.KrakkenException
 import krakken.model._
 import krakken.utils.Implicits._
-import krakken.utils.io._
+import io._
 
 import scala.reflect.ClassTag
 

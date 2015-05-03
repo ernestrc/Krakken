@@ -1,7 +1,6 @@
-package krakken.model
+package krakken.http
 
 import akka.actor.ActorSystem
-import krakken.http.{KrakkenEndpoint, CQRSEndpoint}
 
 import scala.reflect.ClassTag
 

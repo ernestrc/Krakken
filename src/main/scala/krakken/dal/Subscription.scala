@@ -1,4 +1,4 @@
-package krakken.model
+package krakken.dal
 
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor._
@@ -8,8 +8,9 @@ import com.mongodb.casbah.MongoClient
 import com.mongodb.{BasicDBObjectBuilder, Bytes, DBCursor, DuplicateKeyException}
 import com.novus.salat.Grater
 import krakken.config.GlobalKrakkenConfig
+import krakken.dal.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe}
 import krakken.model.Exceptions.FailedToConsumeSubscription
-import krakken.model.SubscriptionMaster.{CursorEmpty, DispatchedEvent, Subscribe}
+import krakken.model.{Event, InjectedTypeHint, Receipt, TypeHint}
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}

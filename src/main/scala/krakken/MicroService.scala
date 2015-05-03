@@ -3,11 +3,11 @@ package krakken
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.IO
-import krakken.config.KrakkenConfig
-import krakken.http.DefaultHttpHandler
-import krakken.model.EndpointProps
+import krakken.http.{DefaultHttpHandler, EndpointProps}
 import krakken.system.BootedSystem
 import spray.can.Http
+
+import scala.util.Try
 
 class MicroService(val name: String,
                    host: Option[String],
@@ -19,7 +19,7 @@ class MicroService(val name: String,
 
   implicit val log: LoggingAdapter = system.log
 
-  def initActorSystem(): Unit = {
+  def initActorSystem(remotePort: Option[Int]): Unit = {
     actorsProps.foreach( props ⇒ system.actorOf(props, props.actorClass().getSimpleName))
     log.info(s"$name actor system is up and running")
   }
@@ -33,10 +33,11 @@ class MicroService(val name: String,
   /* Check valid configuration */
   (host, port, endpointProps, httpHandlerProps) match {
     case (Some(h), Some(p), list, Some(handler)) if list.nonEmpty ⇒
-      initActorSystem()
+      initActorSystem(port)
       initHttpServer(p, h, handler)
     case (None, None, list, None) if list.isEmpty ⇒
-      initActorSystem()
+      val remotePort = Try(system.settings.config.getInt("akka.remote.netty.tcp.port")).toOption
+      initActorSystem(remotePort)
     case anyElse ⇒
       throw new Exception(s"Combination $host - $port - $endpointProps - $httpHandlerProps not valid!")
   }

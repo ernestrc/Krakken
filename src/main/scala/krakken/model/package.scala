@@ -1,6 +1,8 @@
 package krakken
 
+import com.novus.salat.TypeHint
 import com.novus.salat._
+import krakken.model.TypeHint
 
 package object model {
 

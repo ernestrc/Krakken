@@ -1,7 +1,7 @@
 package krakken.macros
 
 import com.novus.salat.Grater
-import krakken.model.{InjectedTypeHint, TypeHint}
+import krakken.model.{TypeHint, InjectedTypeHint}
 
 import scala.reflect.macros.whitebox
 import scala.util.parsing.json.{JSONArray, JSONObject}

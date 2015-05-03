@@ -8,6 +8,7 @@ libraryDependencies ++= List(
   "io.spray"                        %% "spray-routing"          % "1.3.2",
   "io.spray"                        %% "spray-caching"          % "1.3.2",
   "io.spray"                        %% "spray-util"             % "1.3.2",
+  "io.spray"                        %% "spray-client"           % "1.3.2",
   "io.spray"                        %% "spray-json"             % "1.3.0",
   "org.mongodb"                     %% "casbah"                 % "2.8.0",
   "com.novus"                       %% "salat"                  % "1.9.9",

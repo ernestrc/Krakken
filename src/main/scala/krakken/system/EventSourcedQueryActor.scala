@@ -6,8 +6,10 @@ import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
 import com.mongodb.casbah.commons.MongoDBObject
 import krakken.config.GlobalKrakkenConfig
+import krakken.dal.Subscription
+import krakken.io
 import krakken.model._
-import krakken.utils.io._
+import io._
 
 import scala.reflect.ClassTag
 import scala.util.Try
