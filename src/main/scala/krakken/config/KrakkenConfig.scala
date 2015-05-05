@@ -7,6 +7,7 @@ import krakken.io
 import io._
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
 
@@ -25,12 +26,12 @@ class KrakkenConfig {
 
   def collectionsDB(collection: String) = config.getString(s"krakken.source.collections.$collection.db")
 
-  def collectionsPort(collection: String) = config.getString(s"krakken.source.collections.$collection.port")
+  def collectionsSourceContainer(collection: String) = config.getString(s"krakken.source.collections.$collection.container")
 
-  def collectionsHost(collection: String): String =
-    getContainerLink(config.getString(s"krakken.source.collections.$collection.container"))
-      .map(_.host.ip)
-      .getOrElse(config.getString(s"krakken.source.collections.$collection.host"))
+  def collectionsPort(collection: String) = config.getInt(s"krakken.source.collections.$collection.port")
+
+  def collectionsConfigHost(collection: String): String =
+    config.getString(s"krakken.source.collections.$collection.host")
 
   val ACTOR_TIMEOUT: FiniteDuration =
     FiniteDuration(config.getDuration("krakken.actors.timeout",

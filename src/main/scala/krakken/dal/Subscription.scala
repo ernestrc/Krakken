@@ -25,7 +25,7 @@ trait Subscription {
 
 //TODO throw exception when non-replicaSet?
 case class AkkaSubscription[A <: Event : ClassTag, B : ClassTag]
-(serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String, remoteDbName: String)(translator: A ⇒ B)
+(serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String, remoteSourcePort: Int, remoteDbName: String)(translator: A ⇒ B)
 (implicit context: ActorContext, subscriber: ActorRef, entityId: Option[String]) extends Subscription {
 
   private var isAlive = false
@@ -47,16 +47,17 @@ case class AkkaSubscription[A <: Event : ClassTag, B : ClassTag]
     }
     context.system.log.debug("AkkaSubscription starting subscription process now...")
     master = context.actorOf(Props(classOf[SubscriptionMaster[A,B]],
-      translator, subscribedTypeHint, remoteSourceHost, remoteDbName, serializer, entityId, localDb, subscriber))
+      translator, subscribedTypeHint, remoteSourceHost, remoteSourcePort, remoteDbName, serializer, entityId, localDb, subscriber))
     isAlive = true
   }
 
 }
 
 object AkkaSubscription{
-  def forView[A <: Event : ClassTag](serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String, remoteDbName: String)
+  def forView[A <: Event : ClassTag](serializer: Grater[A], localDb: MongoDB, remoteSourceHost: String,
+                                     remoteSourcePort: Int, remoteDbName: String)
     (implicit context: ActorContext, subscriber: ActorRef, entityId: Option[String]): Subscription =
-    AkkaSubscription[A,A](serializer, localDb, remoteSourceHost, remoteDbName)(a ⇒ a)
+    AkkaSubscription[A,A](serializer, localDb, remoteSourceHost, remoteSourcePort, remoteDbName)(a ⇒ a)
 }
 
 object SubscriptionMaster {
@@ -71,6 +72,7 @@ class SubscriptionMaster[A <: Event, B](
   translator: A ⇒ B,
   typeHint: TypeHint,
   remoteSourceHost: String,
+  remoteSourcePort: Int,
   remoteDbName: String,
   serializer: Grater[A],
   entityId: Option[String],
@@ -129,7 +131,8 @@ class SubscriptionMaster[A <: Event, B](
   }
 
   val eventSourceHost: String = remoteSourceHost
-  val subsClient = MongoClient(eventSourceHost)
+  val eventSourcePort: Int = remoteSourcePort
+  val subsClient = MongoClient(eventSourceHost, eventSourcePort)
   val opLog = subsClient("local")("oplog.rs")
   val localColl = localDb(classOf[Subscription].getSimpleName)
 
