@@ -1,22 +1,21 @@
 package krakken.system
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor._
 import akka.event.LoggingAdapter
+import akka.pattern.ask
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.MongoClient
 import com.mongodb.casbah.commons.MongoDBObject
 import krakken.config.GlobalKrakkenConfig
 import krakken.dal.Subscription
-import krakken.io
+import krakken.io._
 import krakken.model._
-import io._
 
+import scala.concurrent.Await
 import scala.reflect.ClassTag
 import scala.util.Try
 
-/**
- * Created by ernest on 4/12/15.
- */
+
 abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] extends Actor with ActorLogging {
   import krakken.utils.Implicits._
   override def postStop(): Unit = {
@@ -33,9 +32,14 @@ abstract class EventSourcedQueryActor[T <: Event : ClassTag : FromHintGrater] ex
       $source.foldLeft(0) { (cc, ev) ⇒ eventProcessor(ev.asInstanceOf[Event]); cc + 1}
     log.info(s"Finished booting up event sourced QUERY actor - ${self.path.name}. Applied $count events")
     subscriptions.foreach(_.subscribe())
+    discoveryActor ! PoisonPill
   }
 
-  val mongoContainer = getContainerLink(GlobalKrakkenConfig.dataContainer)
+  val discoveryActor = context.actorOf(Props[DiscoveryActor])
+  val mongoContainer: Option[Service] = Try(Await.result(discoveryActor.ask(
+    DiscoveryActor.Find(GlobalKrakkenConfig.dataContainer))(GlobalKrakkenConfig.ACTOR_TIMEOUT)
+    .mapTo[Service], GlobalKrakkenConfig.ACTOR_TIMEOUT))
+    .toOption
   val mongoHost: String =  mongoContainer.map(_.host.ip).getOrElse(GlobalKrakkenConfig.mongoHost)
   val mongoPort: Int = mongoContainer.map(_.port).getOrElse(GlobalKrakkenConfig.mongoPort)
   val dbName: String = GlobalKrakkenConfig.dbName
