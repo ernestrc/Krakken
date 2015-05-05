@@ -1,15 +1,19 @@
 package krakken.http
 
+import akka.actor.SupervisorStrategy.{Restart, Escalate}
 import akka.actor._
+import akka.io.IO
 import akka.util.Timeout
 import krakken.config.GlobalKrakkenConfig
-import spray.routing.{HttpService, Route}
+import spray.can.Http
+import spray.routing.HttpService
 
-trait HttpHandler { this: HttpConfig with Actor ⇒
+trait HttpHandler {
+  this: HttpConfig with Actor ⇒
 
   val endpointProps: List[EndpointProps]
 
-//  val authenticationProvider: AuthenticationProvider
+  //  val authenticationProvider: AuthenticationProvider
 
 }
 
@@ -19,32 +23,39 @@ trait HttpHandler { this: HttpConfig with Actor ⇒
 class DefaultHttpHandler(val endpointProps: List[EndpointProps])
   extends HttpHandler with HttpService with Actor with DefaultHttpConfig {
 
-  import context.dispatcher
+  override def supervisorStrategy: SupervisorStrategy = OneForOneStrategy.apply(){
+    case e: DeathPactException ⇒ Escalate
+    case e: ActorNotFound ⇒ Escalate
+    case e: Exception ⇒ Restart
+  }
+
+  @throws[Exception](classOf[Exception])
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    super.preRestart(reason, message)
+
+  }
 
   @throws[Exception](classOf[Exception])
   override def postRestart(reason: Throwable): Unit = {
     context.system.log.debug("Created new fresh http handler instance. Reason {}", reason)
+    super.postRestart(reason)
   }
 
   implicit val t: Timeout = GlobalKrakkenConfig.ACTOR_TIMEOUT
 
   override implicit def actorRefFactory: ActorRefFactory = context.system
 
-  val h = endpointProps.head.boot(context.system)
-  var remoteActors: Seq[ActorSelection] = Seq.empty[ActorSelection] ++ h.remoteActors
+  val h = endpointProps.head.boot(context)
+  var remoteActors: List[ActorRef] = h.remoteActors
 
   val routes = endpointProps.tail.foldLeft(h.$route) {
     (chain, next) ⇒
-      val booted = next.boot(context.system)
+      val booted = next.boot(context)
       remoteActors ++= booted.remoteActors
       chain ~ booted.$route
   }
 
-  remoteActors.foreach(_.resolveOne().map(context.watch).onFailure{
-    case e: Exception ⇒
-      val msg = s"THERE IS NO CONNECTIVITY BETWEEN GATEWAY AND REMOTE ACTOR SYSTEMS: $e"
-      throw new Exception(msg, e)
-  })
+  remoteActors.foreach(context.watch)
 
   def receive: Receive =
     runRoute(routes)(exceptionHandler, rejectionHandler,

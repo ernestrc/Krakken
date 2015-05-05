@@ -3,7 +3,7 @@ package krakken
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.IO
-import krakken.http.{DefaultHttpHandler, EndpointProps}
+import krakken.http.{DefaultHttpHandler, EndpointProps, SystemOverseer}
 import krakken.system.BootedSystem
 import spray.can.Http
 
@@ -25,7 +25,7 @@ class MicroService(val name: String,
   }
 
   def initHttpServer(p: Int, h:String, handler: Props): Unit = {
-    val httpHandler = system.actorOf(handler)
+    val httpHandler = system.actorOf(handler, "http")
     IO(Http) ! Http.Bind(httpHandler, h, port = p)
     log.info(s"$name http interface is listening on $h:$p")
   }
@@ -51,7 +51,7 @@ object MicroService{
   def apply(name:String, host:String, port:Int, actorProps: List[Props],
             endpointProps: List[EndpointProps]): MicroService =
     new MicroService(name, Some(host), Some(port), actorProps, endpointProps,
-      Some(DefaultHttpHandler.props(endpointProps)))
+      Some(SystemOverseer.props(DefaultHttpHandler.props(endpointProps))))
 
   /**
    * Boot Microservice only with actor system

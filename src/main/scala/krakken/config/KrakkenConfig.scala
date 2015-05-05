@@ -36,6 +36,10 @@ class KrakkenConfig {
     FiniteDuration(config.getDuration("krakken.actors.timeout",
       TimeUnit.SECONDS), TimeUnit.SECONDS)
 
+  val OVERSEER_RESTART: FiniteDuration =
+    FiniteDuration(config.getDuration("krakken.actors.overseer-restart",
+      TimeUnit.SECONDS), TimeUnit.SECONDS)
+
   val REGISTRATION_TTL: Int = config.getInt("krakken.etcd.registration-ttl")
 
   val ETCD_POLLING: FiniteDuration = {

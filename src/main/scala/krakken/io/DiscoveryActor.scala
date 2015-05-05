@@ -64,6 +64,12 @@ class DiscoveryActor extends Actor with ActorLogging {
     log.info(s"Discovery actor finished booting up. ETCD instance -> $etcd")
   }
 
+
+  @throws[Exception](classOf[Exception])
+  override def postStop(): Unit = {
+    log.debug(s"Stopped Discovery Actor - {}", self.path.name)
+  }
+
   val pipeline: HttpRequest ⇒ Future[HttpResponse] =
     sendReceive ~> unmarshal[HttpResponse]
 
