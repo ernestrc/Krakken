@@ -64,10 +64,10 @@ class DiscoveryActor extends Actor with ActorLogging {
     log.info(s"Discovery actor finished booting up. ETCD instance -> $etcd")
   }
 
-
   @throws[Exception](classOf[Exception])
-  override def postStop(): Unit = {
-    log.debug(s"Stopped Discovery Actor - {}", self.path.name)
+  override def postRestart(reason: Throwable): Unit = {
+    log.warning(s"Restarted discovery actor in path ${self.path}. Reason $reason")
+    preStart()
   }
 
   val pipeline: HttpRequest ⇒ Future[HttpResponse] =

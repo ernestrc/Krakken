@@ -1,6 +1,6 @@
 package krakken.http
 
-import akka.actor.SupervisorStrategy.{Restart, Escalate}
+import akka.actor.SupervisorStrategy.{Stop, Restart, Escalate}
 import akka.actor._
 import akka.io.IO
 import akka.util.Timeout
@@ -30,15 +30,14 @@ class DefaultHttpHandler(val endpointProps: List[EndpointProps])
   }
 
   @throws[Exception](classOf[Exception])
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    super.preRestart(reason, message)
-
+  override def preStart(): Unit = {
+    context.system.log.debug("Handler up and running in {}", self.path)
   }
 
   @throws[Exception](classOf[Exception])
   override def postRestart(reason: Throwable): Unit = {
-    context.system.log.debug("Created new fresh http handler instance. Reason {}", reason)
-    super.postRestart(reason)
+    context.system.log.warning("Created new fresh http handler instance. Reason {}", reason)
+    preStart()
   }
 
   implicit val t: Timeout = GlobalKrakkenConfig.ACTOR_TIMEOUT

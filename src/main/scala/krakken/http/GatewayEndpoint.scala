@@ -90,11 +90,11 @@ abstract class GatewayEndpoint extends KrakkenEndpoint {
   val route: (ActorRef, ActorRef) ⇒ Route
 
   def entityCommandActor(entityId: String): ActorSelection =
-    context.actorSelection(commandService / remoteCommandGuardianPath / entityId.toString)
+    context.actorSelection(commandServiceUrl / remoteCommandGuardianPath / entityId.toString)
 
 
   def entityQueryActor(entityId: String): ActorSelection =
-    context.actorSelection(queryService / remoteQueryGuardianPath / entityId.toString)
+    context.actorSelection(queryServiceUrl / remoteQueryGuardianPath / entityId.toString)
 
   implicit class pimpedSelection(selection: ActorSelection) {
 
