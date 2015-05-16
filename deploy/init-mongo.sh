@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # osx only -- returns mongo host
-host=`boot2docker ip`
+host=$DOCKER_HOST
 primaryport=27017
 secondaryport=27018
 

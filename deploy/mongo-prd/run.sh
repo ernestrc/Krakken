@@ -4,7 +4,12 @@ set -m
 db_path=/data/db
 lockfile=$db_path/mongod.lock
 
-cmd="mongod --replSet krakken --journal --smallfiles --dbpath $db_path"
+if [ -z "$MONGO_PORT" ]; then
+    export MONGO_PORT=27017
+fi
+
+
+cmd="mongod --replSet krakken --journal --smallfiles --dbpath $db_path --port $MONGO_PORT"
 
 if [ ! -f $lockfile ]; then
     exec $cmd
