@@ -1,9 +1,14 @@
 #!/bin/bash
 
 # osx only -- returns mongo host
-host=$DOCKER_HOST
+#host=$DOCKER_HOST
+hostIn="$DOCKER_HOST"
+arrHost=(${hostIn//:/ })
+host=${arrHost[1]///}
 primaryport=27017
 secondaryport=27018
+
+docker stop rs0 rs1 amb
 
 # Clean containers
 docker rm $(docker ps -a -q)
